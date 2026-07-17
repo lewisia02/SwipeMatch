@@ -8,16 +8,16 @@
 
 ## 2. 技術スタック
 
-現時点で確定している最小構成です。テストフレームワーク・Linter/Formatter・ビルドツールなどは、選定が確定した時点で本節に追記します（7章の更新ルールに従う）。
-
-- **開発環境**: devcontainer（`.devcontainer/` で定義。Python と Node.js を同梱）
-- **言語**:
-    - Python 3.12 系（バックエンド／システム開発）
-    - TypeScript 5.x（フロントエンド等）
+- **開発環境**: devcontainer（`.devcontainer/` で定義。Node.js を同梱）
+- **フロントエンド**: Next.js (App Router), TypeScript 5.x, Tailwind CSS
+- **バックエンド/ストレージ**: Supabase（Database & Storage、無料枠で運用）
+- **スワイプUI実装**: `react-tinder-card` または `framer-motion`
 - **ランタイム**: Node.js 24.x
-- **パッケージ／環境管理**:
-    - Python: uv
-    - Node.js: npm
+- **パッケージ／環境管理**: npm
+- **テスト**: Vitest（ユニット/統合）、Playwright（E2E）
+- **Lint/Format**: ESLint、Prettier
+
+詳細は `docs/architecture.md`・`docs/development-guidelines.md` を参照。
 
 ## 3. スペック駆動開発の基本原則
 
