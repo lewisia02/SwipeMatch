@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(prd-writing)",
+      "Skill(functional-design)",
+      "Skill(ui-design)",
+      "Skill(architecture-design)",
+      "Skill(repository-structure)",
+      "Skill(development-guidelines)",
+      "Skill(glossary-creation)",
+      "Skill(steering)",
+      "Skill(consistency-check)",
+      "Bash(npm install *)",
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(npm list *)",
+      "Bash(uv *)",
+      "Bash(npx *)",
+      "Bash(git status *)",
+      "Bash(git branch *)",
+      "Bash(git log *)",
+      "Bash(git diff *)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{var j=JSON.parse(d);var f=(j.tool_input&&j.tool_input.file_path)||'';var bs=String.fromCharCode(92);var n=f.split(bs).join('/');var lower=n.toLowerCase();var isDoc=(lower.indexOf('/docs/')!==-1||lower.indexOf('docs/')===0)&&lower.slice(-3)==='.md';var isClaude=lower==='claude.md'||lower.slice(-10)==='/claude.md';if(isDoc||isClaude){var msg='ドキュメント('+f+')が変更されました。docs配下の他ドキュメントやCLAUDE.mdへの波及がないか、consistency-checkスキルでの横断チェックを検討してください(必須ではなく変更内容に応じて判断してよい)。';process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'PostToolUse',additionalContext:msg}}));}}catch(e){}});\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/record-skill-usage.js\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
