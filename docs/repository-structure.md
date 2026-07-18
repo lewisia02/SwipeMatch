@@ -127,8 +127,9 @@ project-root/
 
 **配置ファイル**:
 - `UploadService.ts`, `VoteService.ts`, `AdminService.ts`, `PhaseService.ts`
+- `container.ts`: 各サービスとRepositoryを組み立てて返すDIファクトリ（`app/api/`から利用し、Route Handlerを薄く保つ）
 
-**命名規則**: PascalCase + `Service`接尾辞
+**命名規則**: PascalCase + `Service`接尾辞（`container.ts`のみ例外）
 
 **依存関係**:
 - 依存可能: `lib/repositories/`, `lib/algorithms/`, `lib/types/`
@@ -161,7 +162,9 @@ lib/services/
 **役割**: `@supabase/supabase-js`クライアントの初期化と環境変数読み込みを一元化する
 
 **配置ファイル**:
-- `client.ts`: `SUPABASE_URL` / `SUPABASE_ANON_KEY` を用いたクライアント生成（Route Handlersから利用）
+- `client.ts`: `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` を用いたクライアント生成（Route Handlersから利用）
+
+本プロジェクトはSupabase Authを使用せず全参加者が匿名であるため、`auth.uid()`を前提としたRLSポリシーが組めない。そのため、DatabaseテーブルとStorageバケットのRLSは全面deny-allとし、Service Role Keyを持つサーバー（Route Handlers経由の`lib/repositories/`）からのみ書き込み・署名付きURL発行を許可する設計とする。クライアントから直接Supabaseへアクセスする経路は存在しない。
 
 **依存関係**:
 - 依存可能: なし（環境変数のみ）

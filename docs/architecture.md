@@ -116,7 +116,8 @@
 - **暗号化**: Supabase・Vercel間の通信はHTTPS/TLSで暗号化される（プラットフォーム標準機能に準拠、独自実装は行わない）
 - **アクセス制御**: 管理者専用のRoute Handlers（`/api/admin/*`）は、各Route Handlerの先頭で共通の認証ヘルパー関数`AdminService.verifySession()`を呼び出し、ログイン成功時に発行したJWT（`jose`で署名、有効期限4時間程度）をhttpOnly・Secure Cookieとして検証する。未認証・期限切れの場合は401を返す。個々のRoute Handlerでの検証ロジックの重複実装は禁止する。なお`middleware.ts`（Edge Middleware）は匿名ID(`anon_id`)発行専用であり、管理者認証には使用しない
 - **匿名IDの発行**: 決選投票の多重投票防止に用いる`anon_id`は、クライアントの自己申告を信頼せず、Next.js Edge Middleware（`middleware.ts`）がリクエスト時にhttpOnly Cookieとして発行・管理する。クライアントJSからは参照・改ざんできない
-- **機密情報管理**: `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `ADMIN_PASSWORD` / `ADMIN_SESSION_SECRET` はすべて環境変数（Vercelの環境変数機能、ローカルは`.env.local`）で管理し、リポジトリにはコミットしない
+- **Supabaseアクセス制御**: 本プロダクトはSupabase Authを使用しない完全匿名構成のため、`auth.uid()`を前提としたRLSポリシーが組めない。DatabaseテーブルとStorageバケットのRLSは全面deny-allとし、Service Role Keyを保持するサーバー（`lib/repositories/`経由）からのみ読み書き・署名付きURL発行を許可する。クライアントから直接Supabaseへアクセスする経路は存在しない
+- **機密情報管理**: `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `ADMIN_PASSWORD` / `ADMIN_SESSION_SECRET` はすべて環境変数（Vercelの環境変数機能、ローカルは`.env.local`）で管理し、リポジトリにはコミットしない
 
 ### 入力検証
 

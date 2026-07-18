@@ -286,7 +286,7 @@ npm install
 
 # 3. 環境変数の設定
 cp .env.example .env.local
-# .env.local に SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY /
+# .env.local に SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY /
 # ADMIN_PASSWORD / ADMIN_SESSION_SECRET を設定
 
 # 4. Supabaseスキーマの適用
