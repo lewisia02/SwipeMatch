@@ -1,20 +1,24 @@
 {
-	"name": "Python & TypeScript (uv + Node.js)",
-	"image": "mcr.microsoft.com/devcontainers/python:3.12",
-	"features": {
-		"ghcr.io/devcontainers/features/node:1": {
-			"version": "24"
-		}
-	},
-	"postCreateCommand": "pip install --upgrade uv && bash scripts/setup.sh",
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"ms-python.python",
-				"charliermarsh.ruff",
-				"dbaeumer.vscode-eslint",
-				"esbenp.prettier-vscode"
-			]
-		}
-	}
+  "name": "Claude Code Sandbox (uv + Node.js)",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24"
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+
+  "postCreateCommand": "python -m pip install --upgrade uv && bash scripts/setup.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
 }
