@@ -1,55 +1,49 @@
-# spec-driven-dev-template
+# SwipeMatch
 
-AIアシスタント(Claude Codeなど)と協働する「スペック駆動開発」の仕組みを備えたプロジェクトテンプレートです。「何を作るか」を永続ドキュメント(`docs/`)で定義し、「今回何をするか」を作業単位(`.steering/`)で計画してから実装する、というワークフローをスキル・コマンド・サブエージェントとして組み込んでいます。
+社内AIイベント「ロゴ作成大会」向けの、ロゴ投票アプリです。認証機構を持たず、URLベースで手早く展開できる社内イベント用のワンショットなシステムとして開発しています。
 
-## 使い方
+## コンセプト
 
-GitHubの「Use this template」からこのリポジトリを元に新しいリポジトリを作成してください。
+- **スワイプで迷わない1次選考**: 100〜200枚規模の作品でも、Tinder風スワイプUIで直感的にサクサク選べ、表示順による有利不利をなくす
+- **心理的ハードルを下げる投票体験**: 「Dislike」ではなく「キープして温存する」という前向きな操作に置き換え、同僚の作品を無下に扱う罪悪感を解消する
+- **認証なしで手早く回せる運営**: 複雑な認証機構を持たずに運用できる
 
-## 全体像
+詳細な背景・KPIは [`docs/product-requirements.md`](docs/product-requirements.md) を参照してください。
 
-```
-.claude/
-├── skills/        # 各ドキュメント作成・作業管理の専門知識(8種)
-├── commands/      # 定型ワークフロー(/setup-project, /add-feature, /review-docs, /next)
-├── agents/        # レビュー・検証を行うサブエージェント(3種)
-└── settings.json  # 共有設定(スキル/コマンドの実行許可、横断チェックのリマインドhook)
+## 画面構成
 
-CLAUDE.md          # プロジェクトの基本ルール(AIが最初に読む)
-docs/              # 永続ドキュメント(プロジェクトの「北極星」)
-├── ideas/         # 壁打ち・アイデアの下書き
-├── product-requirements.md   # PRD
-├── functional-design.md      # 機能設計書
-├── ui-design.md              # 画面設計書(Web/GUIの場合)
-├── architecture.md           # アーキテクチャ設計書
-├── repository-structure.md   # リポジトリ構造定義書
-├── development-guidelines.md # 開発ガイドライン
-└── glossary.md               # 用語集
-.devcontainer/     # Python(uv) + Node.js の開発コンテナ定義
-scripts/           # 環境確認・依存関係セットアップスクリプト(Windows/Linux/macOS)
-```
+| ID | 画面 | 概要 | 状態 |
+| --- | --- | --- | --- |
+| S-01 | トップ画面 | イベント概要と投稿/投票への導線 | ✅ 実装済み |
+| S-02 | 画像投稿画面 | ロゴ画像・投稿者名・一口メモを投稿 | ✅ 実装済み |
+| S-03 | スワイプ1次選考画面 | 画像をランダム順に表示し、キープ／次へで仕分け | ✅ 実装済み |
+| S-04 | 決選投票画面 | キープした画像から上位3つまで選んで投票 | 未実装 |
+| S-05 | 管理者ログイン画面 | 運営が管理者機能にアクセスするための認証 | 未実装 |
+| S-06 | 管理者ダッシュボード | フェーズ切り替え、QRコード表示など運営操作 | 未実装 |
+| S-07 | 結果発表画面 | 得票ランキングと投稿者名を表示 | 未実装 |
 
-`.steering/`(作業単位のドキュメント)は作業ごとに新規作成され、`.gitignore`でGit管理対象外にしています。
+画面遷移・ワイヤーフレームの詳細は [`docs/ui-design.md`](docs/ui-design.md) を参照してください。
 
-## 3つの構成要素
+## 技術スタック
 
-- **スキル(skills)**: ドキュメント作成や作業管理の専門知識。AIが状況に応じて自動的に読み込みます。
-  - 設計系7種: `prd-writing` / `functional-design` / `ui-design` / `architecture-design` / `repository-structure` / `development-guidelines` / `glossary-creation`
-  - 作業管理2種: `steering`(作業計画・実装・振り返りを一元管理) / `consistency-check`(ドキュメント間の横断整合性チェック)
-- **コマンド(commands)**: よく使う定型ワークフロー。`/` で起動します。
-- **サブエージェント(agents)**: 独立したコンテキストで詳細な分析を行う専門役。
-  - `doc-reviewer`(ドキュメントレビュー) / `implementation-validator`(実装検証) / `ui-reviewer`(UI検証)
+| 分類 | 技術 |
+| --- | --- |
+| フレームワーク | Next.js (App Router) |
+| 言語 | TypeScript 5.x |
+| スタイリング | Tailwind CSS |
+| スワイプUI | framer-motion |
+| バックエンド/DB | Supabase (Database) |
+| ストレージ | Supabase Storage |
+| テスト | Vitest（ユニット/統合）、Playwright（E2E） |
+| Lint/Format | ESLint、Prettier |
 
-## 開発の始め方
+詳細は [`docs/architecture.md`](docs/architecture.md) を参照してください。
 
-### 1. リポジトリのクローンと環境準備
+## セットアップ
 
-```bash
-git clone [新しく作成したリポジトリ]
-cd [リポジトリ名]
-```
+### 1. 環境準備
 
-Dev Containerを使う場合、VS Codeで「Reopen in Container」を選択すると `.devcontainer/devcontainer.json` に基づき自動的に環境構築されます。使わない場合は、以下のスクリプトで必要なツール(uv / Node.js)の有無を確認してください。
+Dev Containerを使う場合、VS Codeで「Reopen in Container」を選択すると `.devcontainer/devcontainer.json` に基づき自動的に環境構築されます。使わない場合は、以下のスクリプトでNode.js(24.x)の有無を確認してください。
 
 ```bash
 # Windows(ローカル)
@@ -59,52 +53,57 @@ powershell -ExecutionPolicy Bypass -File scripts/setup.ps1
 bash scripts/setup.sh
 ```
 
-### 2. 永続ドキュメントの作成(初回セットアップ)
+### 2. 依存関係のインストール
 
-1. アイデアを `docs/ideas/` にまとめる(壁打ちの成果物など、自由形式)
-2. `/setup-project` を実行し、7つの永続ドキュメントを対話的に作成する
-
-```text
-> /setup-project
+```bash
+npm install
 ```
 
-### 3. 機能の追加
+### 3. 環境変数の設定
 
-```text
-> /add-feature ユーザープロフィール編集
+`.env.example` を `.env.local` にコピーし、Supabaseプロジェクトの情報を設定してください。
+
+```bash
+cp .env.example .env.local
 ```
 
-`.steering/` にステアリングファイルを生成し、実装 → 検証(`implementation-validator`)→ テスト → 振り返りまでを自動で進めます。
+| 変数名 | 用途 |
+| --- | --- |
+| `SUPABASE_URL` | SupabaseプロジェクトのURL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service Role Key（本アプリはSupabase Authを使わない匿名構成のため、サーバー側のみがService Role Keyで読み書きする） |
+| `ADMIN_PASSWORD` | 管理者画面のログインパスワード |
+| `ADMIN_SESSION_SECRET` | 管理者セッション(JWT)の署名用シークレット |
 
-### 4. 日常的な使い方
+### 4. 開発サーバーの起動
 
-スペック駆動開発の詳細を意識する必要はありません。普通に会話で依頼すれば、AIが適切なスキルを判断して読み込みます。
-
-```text
-# ドキュメントの編集
-> PRDに新機能を追加してください
-> architecture.mdのパフォーマンス要件を見直して
-
-# 詳細レビュー
-> /review-docs docs/architecture.md
-
-# 次に何をすべきか迷ったとき
-> /next
-
-# 複数ドキュメントにまたがる仕様変更をした後の横断チェック
-> /check-consistency
+```bash
+npm run dev
 ```
 
-## コマンド一覧
+## 開発コマンド
 
 | コマンド | 説明 |
 | --- | --- |
-| `/setup-project` | 初回セットアップ。7つの永続ドキュメントを対話的に作成 |
-| `/add-feature [機能名]` | 新機能を計画・実装・検証まで自動で実行 |
-| `/review-docs [パス]` | 指定ドキュメントをサブエージェントで詳細レビュー |
-| `/check-consistency` | docs配下のドキュメント間の横断整合性チェック |
-| `/next` | 進捗を診断し、次に取るべきアクションを提案 |
+| `npm run dev` | 開発サーバーを起動 |
+| `npm run build` | 本番ビルド |
+| `npm test` | Vitestによるユニット/統合テストを実行 |
+| `npm run lint` | ESLintによる静的解析 |
+| `npm run typecheck` | TypeScriptの型チェック |
+| `npm run format` | Prettierによるフォーマット |
 
-## CLAUDE.mdについて
+## ドキュメント
 
-`CLAUDE.md` はこのテンプレートの基本ルールを定義したファイルです。技術スタック(2章)は現時点でのデフォルト値(Python 3.12 + uv、Node.js 24 + npm)なので、プロジェクトに合わせて書き換えてください。技術スタックやカスタムコマンド・スキル構成を変更した場合は、7章の更新ルールに従ってCLAUDE.md自体も更新してください。
+このプロジェクトは「スペック駆動開発」のワークフローに従っています。「何を作るか」を定義する永続ドキュメントは `docs/` 配下にあります。
+
+```
+docs/
+├── product-requirements.md   # プロダクト要求定義書(PRD)
+├── functional-design.md      # 機能設計書
+├── ui-design.md              # 画面設計書
+├── architecture.md           # アーキテクチャ設計書
+├── repository-structure.md   # リポジトリ構造定義書
+├── development-guidelines.md # 開発ガイドライン
+└── glossary.md                # 用語集
+```
+
+開発の基本ルールは [`CLAUDE.md`](CLAUDE.md) を参照してください。
