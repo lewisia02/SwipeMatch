@@ -26,7 +26,15 @@ vi.mock('@/lib/repositories/LogoRepository', () => {
         memo: 'テストメモ',
         createdAt: new Date('2026-07-18T00:00:00.000Z'),
       }),
-      findAll: vi.fn(),
+      findAll: vi.fn().mockResolvedValue([
+        {
+          id: 'logo-1',
+          imageUrl: 'https://example.com/logos/abc.jpg',
+          uploaderName: '山田太郎',
+          memo: 'テストメモ',
+          createdAt: new Date('2026-07-18T00:00:00.000Z'),
+        },
+      ]),
       delete: vi.fn(),
       createSignedUploadUrl: vi.fn().mockResolvedValue({
         uploadUrl: 'https://example.com/upload',
@@ -39,7 +47,7 @@ vi.mock('@/lib/repositories/LogoRepository', () => {
 });
 
 const { POST: postUploadUrl } = await import('@/app/api/logos/upload-url/route');
-const { POST: postLogo } = await import('@/app/api/logos/route');
+const { GET: getLogos, POST: postLogo } = await import('@/app/api/logos/route');
 
 function jsonRequest(url: string, body: unknown) {
   return new NextRequest(url, {
@@ -78,6 +86,30 @@ describe('POST /api/logos/upload-url', () => {
     const response = await postUploadUrl(
       jsonRequest('http://localhost/api/logos/upload-url', { contentType: 'image/jpeg' }),
     );
+
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('GET /api/logos', () => {
+  beforeEach(() => {
+    mockAppSettings.currentPhase = 'voting';
+  });
+
+  it('votingフェーズの場合、投稿者名を含まないLogo一覧を返す', async () => {
+    const response = await getLogos();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.logos).toHaveLength(1);
+    expect(body.logos[0]).not.toHaveProperty('uploaderName');
+    expect(body.logos[0]).toMatchObject({ id: 'logo-1', memo: 'テストメモ' });
+  });
+
+  it('votingフェーズでない場合、403を返す', async () => {
+    mockAppSettings.currentPhase = 'submission';
+
+    const response = await getLogos();
 
     expect(response.status).toBe(403);
   });
