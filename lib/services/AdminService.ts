@@ -1,7 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { rankWithTieDetection } from '@/lib/algorithms/rankWithTieDetection';
 import { UnauthorizedError } from '@/lib/errors';
-import type { AppSettingsRepository } from '@/lib/repositories/AppSettingsRepository';
 import type { LogoRepository } from '@/lib/repositories/LogoRepository';
 import type { VoteRepository } from '@/lib/repositories/VoteRepository';
 import type { EventPhase } from '@/lib/types/AppSettings';
@@ -34,7 +33,6 @@ function toCsvField(value: string | number): string {
 
 export class AdminService {
   constructor(
-    private appSettingsRepository: AppSettingsRepository,
     private logoRepository: LogoRepository,
     private voteRepository: VoteRepository,
     private phaseService: PhaseService,

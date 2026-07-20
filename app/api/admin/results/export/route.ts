@@ -11,9 +11,11 @@ export async function GET(request: NextRequest) {
 
     const csv = await adminService.exportResultsCsv();
 
-    return new NextResponse(csv, {
+    // ExcelがUTF-8として自動認識できるようBOMを付与する（BOMなしだと日本語が文字化けする）
+    const UTF8_BOM = '﻿';
+    return new NextResponse(`${UTF8_BOM}${csv}`, {
       headers: {
-        'Content-Type': 'text/csv',
+        'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': 'attachment; filename="results.csv"',
       },
     });

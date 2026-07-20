@@ -1,7 +1,6 @@
 import { SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PhaseMismatchError, UnauthorizedError, ValidationError } from '@/lib/errors';
-import type { AppSettingsRepository } from '@/lib/repositories/AppSettingsRepository';
 import type { LogoRepository } from '@/lib/repositories/LogoRepository';
 import type { VoteRepository } from '@/lib/repositories/VoteRepository';
 import { AdminService } from '@/lib/services/AdminService';
@@ -63,7 +62,6 @@ describe('AdminService', () => {
   describe('login', () => {
     it('正しいパスワードの場合、JWTトークンを発行する', async () => {
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         createMockPhaseService(),
@@ -77,7 +75,6 @@ describe('AdminService', () => {
 
     it('誤ったパスワードの場合、UnauthorizedErrorをスローする', async () => {
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         createMockPhaseService(),
@@ -90,7 +87,6 @@ describe('AdminService', () => {
   describe('verifySession', () => {
     it('有効なトークンの場合、何もスローしない', async () => {
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         createMockPhaseService(),
@@ -102,7 +98,6 @@ describe('AdminService', () => {
 
     it('トークンが存在しない場合、UnauthorizedErrorをスローする', async () => {
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         createMockPhaseService(),
@@ -113,7 +108,6 @@ describe('AdminService', () => {
 
     it('期限切れのトークンの場合、UnauthorizedErrorをスローする', async () => {
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         createMockPhaseService(),
@@ -129,7 +123,6 @@ describe('AdminService', () => {
 
     it('異なるシークレットで署名されたトークンの場合、UnauthorizedErrorをスローする', async () => {
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         createMockPhaseService(),
@@ -148,7 +141,6 @@ describe('AdminService', () => {
     it('前方への遷移の場合、PhaseService.transitionToを呼び出す', async () => {
       const phaseService = createMockPhaseService('submission');
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         phaseService,
@@ -162,7 +154,6 @@ describe('AdminService', () => {
     it('逆行遷移の場合、ValidationErrorをスローする', async () => {
       const phaseService = createMockPhaseService('results');
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         phaseService,
@@ -175,7 +166,6 @@ describe('AdminService', () => {
   describe('getRankedResults', () => {
     it('resultsフェーズ以外の場合、PhaseMismatchErrorをスローする', async () => {
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(),
         createMockVoteRepository(),
         createMockPhaseService('voting'),
@@ -187,7 +177,6 @@ describe('AdminService', () => {
     it('resultsフェーズの場合、得票数降順のランキングを返す', async () => {
       const logos = [buildLogo({ id: 'logo-1' }), buildLogo({ id: 'logo-2' })];
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(logos),
         createMockVoteRepository({ 'logo-1': 3, 'logo-2': 5 }),
         createMockPhaseService('results'),
@@ -204,7 +193,6 @@ describe('AdminService', () => {
     it('ランキングをCSV文字列に変換する', async () => {
       const logos = [buildLogo({ id: 'logo-1', uploaderName: '山田太郎', memo: 'メモ1' })];
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(logos),
         createMockVoteRepository({ 'logo-1': 2 }),
         createMockPhaseService('results'),
@@ -219,7 +207,6 @@ describe('AdminService', () => {
     it('=+-@で始まるフィールドは数式実行を防ぐためタブを付与する（CSVインジェクション対策）', async () => {
       const logos = [buildLogo({ id: 'logo-1', uploaderName: '=SUM(A1:A10)', memo: '@メモ' })];
       const service = new AdminService(
-        {} as AppSettingsRepository,
         createMockLogoRepository(logos),
         createMockVoteRepository({ 'logo-1': 1 }),
         createMockPhaseService('results'),

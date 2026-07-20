@@ -25,5 +25,5 @@ export function createAdminService(): AdminService {
   const logoRepository = new LogoRepository();
   const voteRepository = new VoteRepository();
   const phaseService = new PhaseService(appSettingsRepository);
-  return new AdminService(appSettingsRepository, logoRepository, voteRepository, phaseService);
+  return new AdminService(logoRepository, voteRepository, phaseService);
 }
