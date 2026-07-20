@@ -112,7 +112,7 @@ project-root/
 **役割**: 複数の`app/api/**/route.ts`にまたがる横断的な処理のうち、`NextRequest`を直接扱うためサービスレイヤーには置けないものを配置する。ビジネスロジックは持たず、サービスレイヤーの呼び出しに徹する
 
 **配置ファイル**:
-- `requireAdminSession.ts`: Cookieから管理者トークンを取得し`AdminService.verifySession()`へ委譲する共通ヘルパー。`app/api/admin/**/route.ts`の3ハンドラ（phase / results / results/export）が個別に認証チェックを重複実装しないために使う
+- `requireAdminSession.ts`: Cookieから管理者トークンを取得し`AdminService.verifySession()`へ委譲する共通ヘルパー`requireAdminSession()`（`NextRequest`用、`app/api/admin/**/route.ts`の各ハンドラが個別に認証チェックを重複実装しないために使う）と、Server Component用の`hasValidAdminSession()`（`next/headers`の`cookies()`を使用し、`app/admin/page.tsx`・`app/admin/results/page.tsx`の事前アクセスガードに使う）の2つをエクスポートする
 
 **命名規則**: camelCase、動詞で始める（`lib/algorithms/`と同様の関数ファイル規約）
 
