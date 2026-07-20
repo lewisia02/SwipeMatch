@@ -80,6 +80,7 @@
 |-----------|----------|-------------|------|
 | ロゴ投稿データ（`logos`テーブル） | Supabase Database (PostgreSQL) | リレーショナルテーブル | 得票数集計・ランキング表示にSQLの集計クエリが利用でき、Storageと同一プラットフォームで完結する |
 | 投票データ（`votes`テーブル） | Supabase Database (PostgreSQL) | リレーショナルテーブル | `logo_id`との結合、`voter_anon_id`単位での件数集計が容易 |
+| 投票済み予約（`vote_locks`テーブル） | Supabase Database (PostgreSQL) | `voter_anon_id`をPRIMARY KEYとするテーブル | 同一anonIdからの同時投票リクエストを一意制約で排他制御し、多重投票のTOCTOUレース条件を防ぐ（`docs/functional-design.md`の匿名IDベースの多重投票防止アルゴリズムを参照） |
 | イベントフェーズ（`app_settings`テーブル） | Supabase Database (PostgreSQL) | シングルトンレコード | 管理者操作による更新をトランザクショナルに扱える |
 | ロゴ画像ファイル | Supabase Storage | jpg/png/heic/webp（バイナリ） | CDN配信されるURLをそのまま`logos.image_url`に保存でき、画像専用の管理が不要 |
 | 1次選考（スワイプ）のキープ状態 | クライアント`localStorage` | JSON | PRD・機能設計書の方針通りMVPではサーバー保存を行わず、実装コストを抑える |

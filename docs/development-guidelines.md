@@ -291,7 +291,7 @@ cp .env.example .env.local
 
 # 4. Supabaseスキーマの適用
 # scripts/schema.sql の内容をSupabaseダッシュボードのSQLエディタで実行し、
-# logos / votes / app_settings テーブルを作成する（手順は docs/ideas/setup_guide.md も参照）
+# logos / votes / vote_locks / app_settings テーブルを作成する（手順は docs/ideas/setup_guide.md も参照）
 
 # 5. 開発サーバーの起動
 npm run dev

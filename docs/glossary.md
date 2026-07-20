@@ -185,7 +185,7 @@
 
 **公式サイト**: https://supabase.com/
 
-**本プロジェクトでの用途**: `logos` / `votes` / `app_settings`テーブルの永続化（Database）と、ロゴ画像ファイルの保存・配信（Storage）
+**本プロジェクトでの用途**: `logos` / `votes` / `vote_locks` / `app_settings`テーブルの永続化（Database）と、ロゴ画像ファイルの保存・配信（Storage）
 
 **バージョン**: `@supabase/supabase-js` ^2.x
 

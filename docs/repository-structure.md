@@ -299,7 +299,7 @@ tests/e2e/
 ### scripts/ (スクリプトディレクトリ)
 
 **配置ファイル**:
-- Supabaseの`logos` / `votes` / `app_settings`テーブル作成用SQL
+- Supabaseの`logos` / `votes` / `vote_locks` / `app_settings`テーブル作成用SQL
 - 開発補助スクリプト（例: ローカル環境でのシード投入）
 
 **例**:

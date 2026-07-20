@@ -63,8 +63,22 @@ interface Vote {
 
 **制約**:
 - 同一 `voterAnonId` が持てる `Vote` レコードは最大3件（決選投票で上位3つまで選択可能なため）
-- 同一 `voterAnonId` が一度投票を確定した後の追加投票は拒否する（再投票不可）
+- 同一 `voterAnonId` が一度投票を確定した後の追加投票は拒否する（再投票不可。原子性の担保方法は後述の`VoteLock`を参照）
 - `voterAnonId` は個人を特定できる情報（投稿者名等）とは紐付けない
+
+### エンティティ: VoteLock（anonId単位の投票済み予約）
+
+```typescript
+interface VoteLock {
+  voterAnonId: string;    // PRIMARY KEY
+  createdAt: Date;
+}
+```
+
+**制約・目的**:
+- `voterAnonId`をPRIMARY KEYとすることで、同一anonIdからの同時投票リクエストのどちらか一方のみが予約に成功することをDB制約で保証する
+- 「`countByAnonId`で件数を確認してから`Vote`を作成する」という読み取り→書き込みの2ステップだけでは、同時に届いた複数リクエストが両方とも「未投票」と判定してしまうTOCTOU（Time-of-check to time-of-use）レース条件が生じ、1人あたり最大3件という制約を突破されうる。`VoteLock`への原子的なINSERTを投票確定の前段に挟むことで、この競合をDB側で防ぐ
+- `Vote`作成が失敗した場合は、対応する`VoteLock`を削除する補償処理を行い、再投票を可能にする（詳細は`VoteService`を参照）
 
 ### エンティティ: AppSettings（フェーズ管理用シングルトン）
 
@@ -100,6 +114,10 @@ erDiagram
         string id PK
         string logoId FK
         string voterAnonId
+        datetime createdAt
+    }
+    VOTE_LOCK {
+        string voterAnonId PK
         datetime createdAt
     }
     APP_SETTINGS {
@@ -147,6 +165,8 @@ class LogoRepository {
 }
 
 class VoteRepository {
+  reserveVoteSlot(anonId: string): Promise<boolean>; // VoteLockへの原子的なINSERT。成功時true、既に予約済み(PRIMARY KEY制約違反)ならfalse
+  releaseVoteSlot(anonId: string): Promise<void>; // Vote作成失敗時の補償処理用（予約を取り消し再投票を可能にする）
   createMany(votes: Omit<Vote, 'id' | 'createdAt'>[]): Promise<Vote[]>;
   countByAnonId(anonId: string): Promise<number>;
   countByLogoId(): Promise<Record<string, number>>; // ランキング集計用
@@ -208,6 +228,8 @@ interface SwipeSession {
 - ブラウザ `localStorage`（固定キーで1ブラウザにつき1セッションを保持。匿名IDには依存しない）
 
 ### VoteService（決選投票）
+
+`submitVotes`は`VoteRepository.reserveVoteSlot`による原子的な予約を投票確定の前段に挟むことで、同一anonIdからの同時リクエストによる多重投票を防ぐ（詳細は「匿名IDベースの多重投票防止」を参照）。予約後に`Vote`作成が失敗した場合は`releaseVoteSlot`で予約を取り消し、再投票を可能にする。
 
 **責務**:
 - 決選投票（最大3件）のバリデーションと登録
@@ -630,9 +652,11 @@ function rankWithTieDetection(logos: (Logo & { voteCount: number })[]): RankedLo
 **計算ロジック**:
 1. リクエスト時、Middlewareが`anon_id`のhttpOnly Cookieの有無を確認し、なければUUIDを発行してCookieとして設定する（クライアントJSからは参照・改ざんできない）
 2. `POST /api/votes` 実行時、Route Handlerが`anon_id` Cookieの値をサーバー側で読み取る（リクエストボディの値は信頼しない）
-3. `VoteRepository.countByAnonId(anonId)` で当該 `anonId` に紐づく既存の `Vote` レコード件数を確認する
-4. 既存レコードが1件でもあれば再投票とみなし、409エラーを返す
-5. 問題なければ、送信された `logoIds`（最大3件）ごとに `Vote` レコードを作成する
+3. `VoteRepository.reserveVoteSlot(anonId)` で `VoteLock` テーブルに `voterAnonId` を原子的にINSERTする。`voterAnonId`はPRIMARY KEYのため、同一anonIdからの同時リクエストでもどちらか一方のみが成功する
+4. 予約に失敗した場合（既に`VoteLock`が存在する＝一意制約違反）は再投票とみなし、409エラーを返す
+5. 予約に成功した場合、送信された `logoIds`（最大3件）ごとに `Vote` レコードを作成する。この作成が失敗した場合は `VoteRepository.releaseVoteSlot(anonId)` で予約を取り消し、再投票を可能にする
+
+> 「`countByAnonId`で件数を確認してから`Vote`を作成する」という読み取り→書き込みの2ステップだけでは、同時に届いた複数リクエストが両方とも「未投票」と判定してしまうTOCTOUレース条件が生じうる。`VoteLock`への原子的なINSERTを前段に挟むことで、この競合をDB制約で防ぐ。
 
 ## パフォーマンス最適化
 
