@@ -5,6 +5,7 @@ import type { Logo } from '@/lib/types/Logo';
 function buildLogo(id: string, voteCount: number): Logo & { voteCount: number } {
   return {
     id,
+    competitionId: 'competition-1',
     imageUrl: `https://example.com/${id}.png`,
     uploaderName: `投稿者${id}`,
     memo: `メモ${id}`,

@@ -3,7 +3,7 @@ import { rankWithTieDetection } from '@/lib/algorithms/rankWithTieDetection';
 import { UnauthorizedError } from '@/lib/errors';
 import type { LogoRepository } from '@/lib/repositories/LogoRepository';
 import type { VoteRepository } from '@/lib/repositories/VoteRepository';
-import type { EventPhase } from '@/lib/types/AppSettings';
+import type { EventPhase } from '@/lib/types/Competition';
 import type { RankedLogo } from '@/lib/types/RankedLogo';
 import type { PhaseService } from '@/lib/services/PhaseService';
 
@@ -65,16 +65,16 @@ export class AdminService {
     }
   }
 
-  async setPhase(phase: EventPhase): Promise<void> {
-    await this.phaseService.transitionTo(phase);
+  async setPhase(competitionId: string, phase: EventPhase): Promise<void> {
+    await this.phaseService.transitionTo(competitionId, phase);
   }
 
-  async getRankedResults(): Promise<RankedLogo[]> {
-    await this.phaseService.assertPhase('results');
+  async getRankedResults(competitionId: string): Promise<RankedLogo[]> {
+    await this.phaseService.assertPhase(competitionId, 'results');
 
     const [logos, voteCounts] = await Promise.all([
-      this.logoRepository.findAll(),
-      this.voteRepository.countByLogoId(),
+      this.logoRepository.findAllByCompetitionId(competitionId),
+      this.voteRepository.countByLogoId(competitionId),
     ]);
 
     const logosWithVoteCount = logos.map((logo) => ({
@@ -85,8 +85,8 @@ export class AdminService {
     return rankWithTieDetection(logosWithVoteCount);
   }
 
-  async exportResultsCsv(): Promise<string> {
-    const results = await this.getRankedResults();
+  async exportResultsCsv(competitionId: string): Promise<string> {
+    const results = await this.getRankedResults(competitionId);
 
     const header = 'rank,imageUrl,uploaderName,memo,voteCount';
     const rows = results.map((logo) =>

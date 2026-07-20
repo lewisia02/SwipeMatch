@@ -9,10 +9,11 @@ import type { Logo } from '@/lib/types/Logo';
 
 const TEST_PASSWORD = 'test-admin-password';
 const TEST_SECRET = 'test-admin-session-secret-value';
+const COMPETITION_ID = 'competition-1';
 
 function createMockLogoRepository(logos: Logo[] = []) {
   return {
-    findAll: vi.fn().mockResolvedValue(logos),
+    findAllByCompetitionId: vi.fn().mockResolvedValue(logos),
   } as unknown as LogoRepository;
 }
 
@@ -24,12 +25,12 @@ function createMockVoteRepository(voteCounts: Record<string, number> = {}) {
 
 function createMockPhaseService(currentPhase: 'submission' | 'voting' | 'results' = 'results') {
   return {
-    assertPhase: vi.fn().mockImplementation(async (expected: string) => {
+    assertPhase: vi.fn().mockImplementation(async (_competitionId: string, expected: string) => {
       if (expected !== currentPhase) {
         throw new PhaseMismatchError(expected as never, currentPhase);
       }
     }),
-    transitionTo: vi.fn().mockImplementation(async (next: string) => {
+    transitionTo: vi.fn().mockImplementation(async (_competitionId: string, next: string) => {
       const order = ['submission', 'voting', 'results'];
       if (order.indexOf(next) <= order.indexOf(currentPhase)) {
         throw new ValidationError('逆行遷移はできません', 'phase');
@@ -41,6 +42,7 @@ function createMockPhaseService(currentPhase: 'submission' | 'voting' | 'results
 function buildLogo(overrides: Partial<Logo> = {}): Logo {
   return {
     id: 'logo-1',
+    competitionId: COMPETITION_ID,
     imageUrl: 'https://example.com/logo-1.png',
     uploaderName: '山田太郎',
     memo: '一口メモ',
@@ -146,9 +148,9 @@ describe('AdminService', () => {
         phaseService,
       );
 
-      await service.setPhase('voting');
+      await service.setPhase(COMPETITION_ID, 'voting');
 
-      expect(phaseService.transitionTo).toHaveBeenCalledWith('voting');
+      expect(phaseService.transitionTo).toHaveBeenCalledWith(COMPETITION_ID, 'voting');
     });
 
     it('逆行遷移の場合、ValidationErrorをスローする', async () => {
@@ -159,7 +161,9 @@ describe('AdminService', () => {
         phaseService,
       );
 
-      await expect(service.setPhase('submission')).rejects.toThrow(ValidationError);
+      await expect(service.setPhase(COMPETITION_ID, 'submission')).rejects.toThrow(
+        ValidationError,
+      );
     });
   });
 
@@ -171,19 +175,21 @@ describe('AdminService', () => {
         createMockPhaseService('voting'),
       );
 
-      await expect(service.getRankedResults()).rejects.toThrow(PhaseMismatchError);
+      await expect(service.getRankedResults(COMPETITION_ID)).rejects.toThrow(PhaseMismatchError);
     });
 
     it('resultsフェーズの場合、得票数降順のランキングを返す', async () => {
       const logos = [buildLogo({ id: 'logo-1' }), buildLogo({ id: 'logo-2' })];
+      const logoRepository = createMockLogoRepository(logos);
       const service = new AdminService(
-        createMockLogoRepository(logos),
+        logoRepository,
         createMockVoteRepository({ 'logo-1': 3, 'logo-2': 5 }),
         createMockPhaseService('results'),
       );
 
-      const results = await service.getRankedResults();
+      const results = await service.getRankedResults(COMPETITION_ID);
 
+      expect(logoRepository.findAllByCompetitionId).toHaveBeenCalledWith(COMPETITION_ID);
       expect(results[0]).toMatchObject({ id: 'logo-2', voteCount: 5, rank: 1 });
       expect(results[1]).toMatchObject({ id: 'logo-1', voteCount: 3, rank: 2 });
     });
@@ -198,7 +204,7 @@ describe('AdminService', () => {
         createMockPhaseService('results'),
       );
 
-      const csv = await service.exportResultsCsv();
+      const csv = await service.exportResultsCsv(COMPETITION_ID);
 
       expect(csv).toContain('rank,imageUrl,uploaderName,memo,voteCount');
       expect(csv).toContain('1,https://example.com/logo-1.png,山田太郎,メモ1,2');
@@ -212,7 +218,7 @@ describe('AdminService', () => {
         createMockPhaseService('results'),
       );
 
-      const csv = await service.exportResultsCsv();
+      const csv = await service.exportResultsCsv(COMPETITION_ID);
 
       expect(csv).toContain('\t=SUM(A1:A10)');
       expect(csv).toContain('\t@メモ');

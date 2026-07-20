@@ -1,7 +1,7 @@
 import { shuffle } from '@/lib/algorithms/shuffle';
 import type { Logo } from '@/lib/types/Logo';
 
-const STORAGE_KEY = 'swipematch:swipe-session';
+const STORAGE_KEY_PREFIX = 'swipematch:swipe-session';
 
 export type SwipeDecision = 'keep' | 'skip';
 
@@ -14,8 +14,11 @@ export interface SwipeSession {
 export class SwipeSessionManager {
   private logosById = new Map<string, Logo>();
   private session: SwipeSession;
+  private storageKey: string;
 
-  constructor(logos: Logo[]) {
+  // storageKeyにcompetitionId（またはslug）を含め、コンペをまたいでキープ状態が混在しないようにする
+  constructor(competitionId: string, logos: Logo[]) {
+    this.storageKey = `${STORAGE_KEY_PREFIX}:${competitionId}`;
     for (const logo of logos) {
       this.logosById.set(logo.id, logo);
     }
@@ -82,7 +85,7 @@ export class SwipeSessionManager {
     if (typeof window === 'undefined') {
       return null;
     }
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(this.storageKey);
     if (!raw) {
       return null;
     }
@@ -97,6 +100,6 @@ export class SwipeSessionManager {
     if (typeof window === 'undefined') {
       return;
     }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    window.localStorage.setItem(this.storageKey, JSON.stringify(session));
   }
 }

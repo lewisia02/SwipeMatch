@@ -1,29 +1,35 @@
-import { AppSettingsRepository } from '@/lib/repositories/AppSettingsRepository';
+import { CompetitionRepository } from '@/lib/repositories/CompetitionRepository';
 import { LogoRepository } from '@/lib/repositories/LogoRepository';
 import { VoteRepository } from '@/lib/repositories/VoteRepository';
 import { AdminService } from '@/lib/services/AdminService';
+import { CompetitionService } from '@/lib/services/CompetitionService';
 import { PhaseService } from '@/lib/services/PhaseService';
 import { UploadService } from '@/lib/services/UploadService';
 import { VoteService } from '@/lib/services/VoteService';
 
+export function createCompetitionService(): CompetitionService {
+  const competitionRepository = new CompetitionRepository();
+  return new CompetitionService(competitionRepository);
+}
+
 export function createUploadService(): UploadService {
-  const appSettingsRepository = new AppSettingsRepository();
+  const competitionRepository = new CompetitionRepository();
   const logoRepository = new LogoRepository();
-  const phaseService = new PhaseService(appSettingsRepository);
-  return new UploadService(logoRepository, phaseService);
+  const phaseService = new PhaseService(competitionRepository);
+  return new UploadService(logoRepository, phaseService, competitionRepository);
 }
 
 export function createVoteService(): VoteService {
-  const appSettingsRepository = new AppSettingsRepository();
+  const competitionRepository = new CompetitionRepository();
   const voteRepository = new VoteRepository();
-  const phaseService = new PhaseService(appSettingsRepository);
+  const phaseService = new PhaseService(competitionRepository);
   return new VoteService(voteRepository, phaseService);
 }
 
 export function createAdminService(): AdminService {
-  const appSettingsRepository = new AppSettingsRepository();
+  const competitionRepository = new CompetitionRepository();
   const logoRepository = new LogoRepository();
   const voteRepository = new VoteRepository();
-  const phaseService = new PhaseService(appSettingsRepository);
+  const phaseService = new PhaseService(competitionRepository);
   return new AdminService(logoRepository, voteRepository, phaseService);
 }

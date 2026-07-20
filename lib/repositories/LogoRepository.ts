@@ -12,6 +12,7 @@ const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
 
 interface LogoRow {
   id: string;
+  competition_id: string;
   image_url: string;
   uploader_name: string;
   memo: string;
@@ -21,6 +22,7 @@ interface LogoRow {
 function toLogo(row: LogoRow): Logo {
   return {
     id: row.id,
+    competitionId: row.competition_id,
     imageUrl: row.image_url,
     uploaderName: row.uploader_name,
     memo: row.memo,
@@ -34,6 +36,7 @@ export class LogoRepository {
     const { data: row, error } = await supabase
       .from('logos')
       .insert({
+        competition_id: data.competitionId,
         image_url: data.imageUrl,
         uploader_name: data.uploaderName,
         memo: data.memo,
@@ -48,9 +51,12 @@ export class LogoRepository {
     return toLogo(row as LogoRow);
   }
 
-  async findAll(): Promise<Logo[]> {
+  async findAllByCompetitionId(competitionId: string): Promise<Logo[]> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase.from('logos').select('*');
+    const { data, error } = await supabase
+      .from('logos')
+      .select('*')
+      .eq('competition_id', competitionId);
 
     if (error) {
       throw new Error(`Logo一覧の取得に失敗しました: ${error.message}`);
