@@ -31,6 +31,7 @@ project-root/
 │   ├── services/            # ビジネスロジック(PhaseService含む)
 │   ├── repositories/        # Supabaseアクセス(データレイヤー)
 │   ├── supabase/             # Supabaseクライアント初期化
+│   ├── api/                   # Route Handlers専用の薄いヘルパー(認証チェック等)
 │   ├── validators/           # zodスキーマ
 │   ├── algorithms/           # shuffle等の純粋関数アルゴリズム
 │   ├── client/                # クライアント専用ロジック(localStorage等。匿名IDはmiddleware.tsに一元化したためlib/client/には含まない)
@@ -103,15 +104,28 @@ project-root/
 - HTTPメソッドごとに`export async function GET/POST(...)`を実装する
 
 **依存関係**:
-- 依存可能: `lib/services/`, `lib/validators/`
+- 依存可能: `lib/services/`, `lib/validators/`, `lib/api/`
 - 依存禁止: `lib/repositories/`（サービスレイヤーを介さないデータアクセス）、`components/`
+
+### lib/api/ (Route Handlers専用の薄いヘルパー)
+
+**役割**: 複数の`app/api/**/route.ts`にまたがる横断的な処理のうち、`NextRequest`を直接扱うためサービスレイヤーには置けないものを配置する。ビジネスロジックは持たず、サービスレイヤーの呼び出しに徹する
+
+**配置ファイル**:
+- `requireAdminSession.ts`: Cookieから管理者トークンを取得し`AdminService.verifySession()`へ委譲する共通ヘルパー。`app/api/admin/**/route.ts`の3ハンドラ（phase / results / results/export）が個別に認証チェックを重複実装しないために使う
+
+**命名規則**: camelCase、動詞で始める（`lib/algorithms/`と同様の関数ファイル規約）
+
+**依存関係**:
+- 依存可能: `lib/services/`
+- 依存禁止: `lib/repositories/`, `components/`
 
 ### components/ (共通UIコンポーネント)
 
 **役割**: `docs/ui-design.md` の共通コンポーネント一覧に対応するReactコンポーネントを配置する
 
 **配置ファイル**:
-- `Button.tsx`, `Input.tsx`, `Textarea.tsx`, `Toast.tsx`, `ProgressBar.tsx`, `Badge.tsx`, `SwipeCard.tsx`, `SelectableGrid.tsx`
+- `Button.tsx`, `Input.tsx`, `Textarea.tsx`, `Toast.tsx`, `ProgressBar.tsx`, `Badge.tsx`, `ConfirmDialog.tsx`, `SwipeCard.tsx`, `SelectableGrid.tsx`, `QRCodeDisplay.tsx`（画面固有, S-06）, `RankingList.tsx`（画面固有, S-07）
 
 **命名規則**:
 - PascalCase（例: `SwipeCard.tsx`）
@@ -221,7 +235,7 @@ lib/client/
 **役割**: `docs/functional-design.md` のデータモデル定義(`Logo` / `Vote` / `AppSettings`等)をTypeScriptの型として配置する
 
 **配置ファイル**:
-- `Logo.ts`, `Vote.ts`, `AppSettings.ts`
+- `Logo.ts`, `Vote.ts`, `AppSettings.ts`, `RankedLogo.ts`（結果発表のランキング表示用。`Logo`を拡張し`voteCount`/`rank`/`isTiedForRunoff`を追加）
 
 **命名規則**: PascalCase（エンティティ名と一致させる）
 
