@@ -18,7 +18,7 @@
 | React | ^19.x | UIコンポーネント構築 | Next.js 15の標準ランタイム |
 | Tailwind CSS | ^3.x | スタイリング | ユーティリティクラスで短期間にモバイル最適なUIを組み立てられる |
 | `react-tinder-card` | ^1.x | スワイプ式1次選考のカードUI | Tinder風スワイプ操作を低コストで実装できる |
-| `framer-motion` | ^11.x | スワイプ時のアニメーション・演出 | キープ／次への操作フィードバック（PRD記載の演出要件）を滑らかに実装できる |
+| `framer-motion` | ^11.x | スワイプ時・結果発表時のアニメーション・演出 | キープ／次への操作フィードバックと、結果発表のランキングスライドイン・得票数カウントアップ（いずれもPRD記載の演出要件）を、追加ライブラリを増やさず滑らかに実装できる |
 | `@supabase/supabase-js` | ^2.x | Supabase Database/Storageクライアント | Supabaseの公式SDKで、Database操作とStorageアップロードを統一的に扱える |
 | `zod` | ^3.x | APIリクエストの入力検証 | TypeScriptの型と連動したスキーマ検証により、Route Handlersの入力バリデーションを簡潔に記述できる |
 | `jose` | ^5.x | 管理者セッション用JWTの署名・検証 | 軽量な認証機構（本格的な認証基盤を持たない方針に合致）をhttpOnly Cookieで実現できる |
@@ -55,6 +55,7 @@
 - **許可される操作**: APIレイヤー（`fetch`によるRoute Handlers呼び出し）の利用
 - **禁止される操作**: サービスレイヤー・データレイヤー（Supabaseクライアント）への直接アクセス
 - 例外: 1次選考のキープ状態（`SwipeSessionManager`）はサーバーを介さずクライアントの`localStorage`のみで完結するため、UIレイヤー内で完結してよい
+- **ルーティング**: 参加者向け画面は`app/c/[slug]/...`配下に配置し、`layout.tsx`（Server Component）でslugからコンペを解決してから配下のClient Componentsへ委譲する。管理者向け画面は`app/admin/...`配下（コンペ横断の一覧・開催は`app/admin/`直下、個別コンペの操作は`app/admin/competitions/[id]/...`）に配置する。詳細なディレクトリ構成は`docs/repository-structure.md`を正とする
 
 #### APIレイヤー
 - **責務**: HTTPリクエストの受付、`zod`による入力検証、フェーズ・認証状態のチェック、サービスレイヤーの呼び出し、レスポンス整形
@@ -63,14 +64,16 @@
 - **補足**: 匿名ID(`anon_id`)の発行のみはRoute Handlersより手前の`middleware.ts`（Next.js Edge Middleware）が担う。全リクエストに対しCookieの有無を確認し、なければ発行する
 
 #### サービスレイヤー
-- **責務**: ビジネスロジックの実装（`UploadService` / `VoteService` / `AdminService` / `PhaseService`。詳細は`docs/functional-design.md`のコンポーネント設計を参照）
+- **責務**: ビジネスロジックの実装（`CompetitionService` / `UploadService` / `VoteService` / `AdminService` / `PhaseService`。詳細は`docs/functional-design.md`のコンポーネント設計を参照）
 - **許可される操作**: データレイヤーの呼び出し
 - **禁止される操作**: UIレイヤー・APIレイヤーへの依存（Requestオブジェクト等を受け取らない）
+- **補足**: `PhaseService`/`UploadService`/`VoteService`/`AdminService`は特定のコンペに紐付かないステートレスな設計とし、各メソッドの引数として`competitionId`を受け取る（コンストラクタでコンペを固定しない）
 
 #### データレイヤー
-- **責務**: Supabase Database/Storageへのデータ永続化・取得（`LogoRepository` / `VoteRepository` / `AppSettingsRepository`）
+- **責務**: Supabase Database/Storageへのデータ永続化・取得（`CompetitionRepository` / `LogoRepository` / `VoteRepository`）
 - **許可される操作**: `@supabase/supabase-js`を通じたDatabase/Storageアクセス
 - **禁止される操作**: ビジネスロジックの実装（集計・バリデーション等はサービスレイヤーの責務）
+- **補足**: 旧`AppSettingsRepository`は`CompetitionRepository`に統合され廃止する
 
 ## データ永続化戦略
 
@@ -78,17 +81,28 @@
 
 | データ種別 | ストレージ | フォーマット | 理由 |
 |-----------|----------|-------------|------|
-| ロゴ投稿データ（`logos`テーブル） | Supabase Database (PostgreSQL) | リレーショナルテーブル | 得票数集計・ランキング表示にSQLの集計クエリが利用でき、Storageと同一プラットフォームで完結する |
-| 投票データ（`votes`テーブル） | Supabase Database (PostgreSQL) | リレーショナルテーブル | `logo_id`との結合、`voter_anon_id`単位での件数集計が容易 |
-| 投票済み予約（`vote_locks`テーブル） | Supabase Database (PostgreSQL) | `voter_anon_id`をPRIMARY KEYとするテーブル | 同一anonIdからの同時投票リクエストを一意制約で排他制御し、多重投票のTOCTOUレース条件を防ぐ（`docs/functional-design.md`の匿名IDベースの多重投票防止アルゴリズムを参照） |
-| イベントフェーズ（`app_settings`テーブル） | Supabase Database (PostgreSQL) | シングルトンレコード | 管理者操作による更新をトランザクショナルに扱える |
+| コンペ（`competitions`テーブル） | Supabase Database (PostgreSQL) | リレーショナルテーブル | `status='active'`の部分ユニークインデックスにより「常に1件のみ開催中」というアプリ全体の不変条件をDB制約でも保証できる。旧`app_settings`（シングルトン）のフェーズ管理はこのテーブルの`current_phase`列に統合する |
+| ロゴ投稿データ（`logos`テーブル） | Supabase Database (PostgreSQL) | リレーショナルテーブル、`competition_id` FK | 得票数集計・ランキング表示にSQLの集計クエリが利用でき、Storageと同一プラットフォームで完結する。`competition_id`でのフィルタにインデックスを張り、コンペ数が増えても一覧取得の速度を維持する |
+| 投票データ（`votes`テーブル） | Supabase Database (PostgreSQL) | リレーショナルテーブル、`competition_id` FK | `logo_id`との結合、`competition_id`＋`voter_anon_id`単位での件数集計が容易 |
+| 投票済み予約（`vote_locks`テーブル） | Supabase Database (PostgreSQL) | `(competition_id, voter_anon_id)`を複合PRIMARY KEYとするテーブル | 同一コンペ・同一anonIdからの同時投票リクエストを一意制約で排他制御し、多重投票のTOCTOUレース条件を防ぐ。複合キー化により、多重投票防止の判定単位がコンペ単位になる（`docs/functional-design.md`の匿名IDベースの多重投票防止アルゴリズムを参照） |
 | ロゴ画像ファイル | Supabase Storage | jpg/png/heic/webp（バイナリ） | CDN配信されるURLをそのまま`logos.image_url`に保存でき、画像専用の管理が不要 |
-| 1次選考（スワイプ）のキープ状態 | クライアント`localStorage` | JSON | PRD・機能設計書の方針通りMVPではサーバー保存を行わず、実装コストを抑える |
+| 1次選考（スワイプ）のキープ状態 | クライアント`localStorage` | JSON | PRD・機能設計書の方針通りMVPではサーバー保存を行わず、実装コストを抑える。キーに`competitionId`を含め、コンペをまたいだ混在を防ぐ |
+
+### マイグレーション戦略（コンペ機能導入時）
+
+- **前提**: 本プロダクトは既に単一イベント分の`logos`/`votes`/`app_settings`データが本番Supabaseプロジェクトに存在する状態でコンペ機能を導入する。データを破棄せず「最初の1件のコンペ」として引き継ぐ（PRDの既存データ移行方針を参照）
+- **新規マイグレーションファイル**: `scripts/migrations/0001_add_competitions.sql`を新設し、以下を1本のSQLにまとめて実行する
+  1. `competitions`テーブルを作成し、`status='active'`の部分ユニークインデックスを設定する
+  2. 既存の`app_settings`（シングルトン行）の内容を基に、最初の`Competition`レコードを`status='active'`で挿入する（`slug`はサーバー側のロジックと同じ生成関数で発行、`title`は仮の初期値とする）
+  3. 既存の`logos`/`votes`/`vote_locks`全件に、2で作成した`competition_id`を一括UPDATEで設定する（導入時点のデータは全件が単一コンペに属するため、条件分岐は不要）
+  4. `competition_id`をNOT NULL化し、`vote_locks`の主キーを`(competition_id, voter_anon_id)`の複合キーに変更する
+- **ロールバック余地**: `app_settings`テーブル自体はこのマイグレーションでは削除せず、動作確認後の別マイグレーション（`0002_drop_app_settings.sql`）で削除する。新規Supabaseプロジェクトへのフルインストール用の`scripts/schema.sql`は、`competitions`を含む最終形（`app_settings`を含まない）に更新する
+- **将来の再実行**: 2件目以降のコンペは通常のアプリケーションロジック（`CompetitionService.activate`）で作成されるため、上記マイグレーションは初回導入時の一度きりの手順である
 
 ### バックアップ戦略
 
-- **前提**: Supabaseの無料（Free）プランには自動バックアップ機能が含まれない（Point-in-Time Recovery等はPro以上のプラン機能）。本プロダクトは社内イベント用のワンショットなシステムであり、この制約はコスト・開発期間とのトレードオフとして許容する
-- **緩和策**: 結果発表フェーズ（`results`）に入ったタイミングで、運営が管理者ダッシュボードから得票ランキングをCSVでエクスポートできる機能をMVPスコープに含める（`GET /api/admin/results/export`）。イベント本番のデータ喪失リスクに備える最低限の手段として位置付ける
+- **前提**: Supabaseの無料（Free）プランには自動バックアップ機能が含まれない（Point-in-Time Recovery等はPro以上のプラン機能）。本プロダクトは社内イベント用の低コスト運用を前提としており、この制約はコスト・開発期間とのトレードオフとして許容する
+- **緩和策**: 各コンペの結果発表フェーズ（`results`）に入ったタイミングで、運営が管理者ダッシュボードから得票ランキングをCSVでエクスポートできる機能をMVPスコープに含める（`GET /api/admin/competitions/[id]/results/export`）。イベント本番のデータ喪失リスクに備える最低限の手段として位置付ける
 - **復元方法**: 自動バックアップは行わないため、障害発生時はSupabaseプロジェクトの再構築＋（可能であれば）エクスポート済みCSVからの手動復旧を前提とする
 
 ## パフォーマンス要件
@@ -116,6 +130,7 @@
 
 - **暗号化**: Supabase・Vercel間の通信はHTTPS/TLSで暗号化される（プラットフォーム標準機能に準拠、独自実装は行わない）
 - **アクセス制御**: 管理者専用のRoute Handlers（`/api/admin/*`）は、各Route Handlerの先頭で共通の認証ヘルパー関数`AdminService.verifySession()`を呼び出し、ログイン成功時に発行したJWT（`jose`で署名、有効期限4時間程度）をhttpOnly・Secure Cookieとして検証する。未認証・期限切れの場合は401を返す。個々のRoute Handlerでの検証ロジックの重複実装は禁止する。なお`middleware.ts`（Edge Middleware）は匿名ID(`anon_id`)発行専用であり、管理者認証には使用しない
+- **管理者画面の事前アクセスガード**: `/admin`（コンペ一覧）・`/admin/competitions/[id]`・`/admin/competitions/[id]/results`は、いずれも`page.tsx`をServer Componentとし、`lib/api/requireAdminSession.ts`の`hasValidAdminSession()`（内部で`AdminService.verifySession()`を呼び出す）によりレンダリング前にセッションを検証する。未認証の場合は`redirect('/admin/login')`でページ本体を送信せずリダイレクトする。検証ロジック自体はRoute Handlers用と共通化されており、独自実装は行わない
 - **匿名IDの発行**: 決選投票の多重投票防止に用いる`anon_id`は、クライアントの自己申告を信頼せず、Next.js Edge Middleware（`middleware.ts`）がリクエスト時にhttpOnly Cookieとして発行・管理する。クライアントJSからは参照・改ざんできない
 - **Supabaseアクセス制御**: 本プロダクトはSupabase Authを使用しない完全匿名構成のため、`auth.uid()`を前提としたRLSポリシーが組めない。DatabaseテーブルとStorageバケットのRLSは全面deny-allとし、Service Role Keyを保持するサーバー（`lib/repositories/`経由）からのみ読み書き・署名付きURL発行を許可する。クライアントから直接Supabaseへアクセスする経路は存在しない
 - **機密情報管理**: `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `ADMIN_PASSWORD` / `ADMIN_SESSION_SECRET` はすべて環境変数（Vercelの環境変数機能、ローカルは`.env.local`）で管理し、リポジトリにはコミットしない
@@ -130,15 +145,15 @@
 
 ### データ増加への対応
 
-- **想定データ量**: 参加者最大200名、ロゴ投稿100〜200件、決選投票データ最大600件（200名 × 最大3票）
-- **パフォーマンス劣化対策**: 想定データ量が小規模なため、ページネーションや複雑なインデックス設計は不要。`logos`一覧取得は全件取得で十分対応できる
-- **アーカイブ戦略**: 本プロダクトは単一イベント用のワンショットシステムであり、自動アーカイブは行わない（PRDのスコープ外）
+- **想定データ量**: コンペ1回あたり参加者最大200名、ロゴ投稿100〜200件、決選投票データ最大600件（200名 × 最大3票）。`competition_id`によるフィルタが常に効くため、コンペ単体のクエリ量はコンペ回数が増えても変化しない
+- **パフォーマンス劣化対策**: コンペ単体のデータ量が小規模なため、ページネーションや複雑なインデックス設計は不要。コンペ単位の`logos`一覧取得は全件取得で十分対応できる。ただし過去コンペが蓄積すると`logos`/`votes`テーブル全体の行数は増え続けるため、`competition_id`へのインデックスは必須とする
+- **アーカイブ戦略**: 過去コンペのデータは自動削除・自動アーカイブを行わない（PRDのスコープ外）。長期的にSupabase無料枠の容量を圧迫する場合は、運営が手動で古いコンペのデータを削除する運用を想定する（自動化は将来検討）
 
 ### 機能拡張性
 
 - **プラグインシステム**: なし（スコープ外）
-- **設定のカスタマイズ**: イベントフェーズを`app_settings`テーブルで管理しているため、将来的に別イベントで再利用する場合もコード変更なしにフェーズ運用ができる
-- **API拡張性**: Route Handlersは機能（投稿・投票・フェーズ・管理者）ごとにファイルを分離しているため、新規エンドポイントの追加が既存コードに影響しにくい
+- **設定のカスタマイズ**: イベントフェーズは旧`app_settings`（アプリ全体で1つ）から`competitions.current_phase`（コンペごとに独立）へ移行済みであり、複数コンペの繰り返し開催はコード変更なしに運用できる。ただし常に1つのみが`active`となる制約（PRD参照）はDB制約とアプリロジックの両方で維持する
+- **API拡張性**: Route Handlersは機能（投稿・投票・フェーズ・コンペ管理・管理者認証）ごとにファイルを分離しているため、新規エンドポイントの追加が既存コードに影響しにくい
 
 ## テスト戦略
 
@@ -151,7 +166,7 @@
 
 ### 統合テスト
 - **方法**: Vitest上でRoute Handlersを直接呼び出し、Supabaseのテスト用プロジェクト（またはローカルSupabase CLI環境）に対してリクエスト〜レスポンスを検証
-- **対象**: 投稿API（正常系・フェーズ不一致・サイズ超過）、投票API（正常系・多重投票・4件以上選択）、管理者API（未認証拒否・フェーズ切替反映）
+- **対象**: 投稿API（正常系・フェーズ不一致・サイズ超過・存在しないslug・closedコンペ）、投票API（正常系・多重投票・4件以上選択・コンペをまたいだ独立カウント）、コンペ管理API（新規開催時の既存active自動クローズ、常に1件のみactiveであること）、管理者API（未認証拒否・フェーズ切替反映・存在しないコンペIDへの404）
 
 ### E2Eテスト
 - **ツール**: Playwright（モバイルビューポート設定を含む）

@@ -215,7 +215,7 @@ feat(vote): 決選投票の上位3件選択機能を追加
 
 キープした画像から最大3件まで選択して投票できるようにした。
 - SelectableGridコンポーネントを追加
-- POST /api/votes に選択件数バリデーションを実装
+- POST /api/c/[slug]/votes に選択件数バリデーションを実装
 ```
 
 ### プルリクエストプロセス
@@ -291,7 +291,7 @@ cp .env.example .env.local
 
 # 4. Supabaseスキーマの適用
 # scripts/schema.sql の内容をSupabaseダッシュボードのSQLエディタで実行し、
-# logos / votes / vote_locks / app_settings テーブルを作成する（手順は docs/ideas/setup_guide.md も参照）
+# competitions / logos / votes / vote_locks テーブルを作成する（手順は docs/ideas/setup_guide.md も参照）
 
 # 5. 開発サーバーの起動
 npm run dev
