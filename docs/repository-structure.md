@@ -6,29 +6,45 @@ Next.js (App Router) の規約に従い、`app/` がUIレイヤーとAPIレイ�
 
 ```
 project-root/
-├── middleware.ts           # 匿名ID(anon_id)のhttpOnly Cookie発行(Edge Middleware)
+├── middleware.ts           # 匿名ID(anon_id)のhttpOnly Cookie発行(Edge Middleware。コンペ非依存でグローバル単一)
 ├── app/                    # UIレイヤー(ページ) + APIレイヤー(Route Handlers)
-│   ├── page.tsx            # S-01 トップ画面
-│   ├── upload/              # S-02 画像投稿画面
-│   ├── vote/
-│   │   ├── swipe/           # S-03 スワイプ1次選考画面
-│   │   └── final/           # S-04 決選投票画面
+│   ├── page.tsx            # グローバルトップ: 開催中コンペへredirect、無ければ案内表示
+│   ├── c/
+│   │   └── [slug]/          # コンペ専用URL配下(参加者向け画面)
+│   │       ├── layout.tsx    # slug→Competition解決(Server Component、404/closedガード)
+│   │       ├── page.tsx      # S-01 トップ画面
+│   │       ├── upload/        # S-02 画像投稿画面
+│   │       └── vote/
+│   │           ├── swipe/     # S-03 スワイプ1次選考画面
+│   │           └── final/     # S-04 決選投票画面
 │   ├── admin/
 │   │   ├── login/           # S-05 管理者ログイン画面
-│   │   ├── page.tsx         # S-06 管理者ダッシュボード
-│   │   └── results/         # S-07 結果発表画面
+│   │   ├── page.tsx         # S-08 管理者コンペ一覧画面(開催・過去コンペ一覧)
+│   │   └── competitions/
+│   │       └── [id]/
+│   │           ├── page.tsx     # S-06 コンペ管理画面
+│   │           └── results/     # S-07 結果発表画面
 │   └── api/                 # APIレイヤー(Route Handlers)
-│       ├── logos/
-│       │   └── upload-url/  # 署名付きアップロードURL発行
-│       ├── votes/
-│       ├── phase/
+│       ├── competitions/
+│       │   └── active/       # 開催中コンペのslug解決(トップページ用)
+│       ├── c/
+│       │   └── [slug]/
+│       │       ├── logos/
+│       │       │   └── upload-url/  # 署名付きアップロードURL発行
+│       │       ├── votes/
+│       │       └── phase/
 │       └── admin/
-│           └── results/
-│               └── export/  # 結果ランキングのCSVエクスポート
+│           ├── login/
+│           └── competitions/
+│               ├── route.ts         # コンペ一覧取得・新規開催
+│               └── [id]/
+│                   ├── phase/
+│                   └── results/
+│                       └── export/  # 結果ランキングのCSVエクスポート
 ├── components/             # 共通UIコンポーネント
 ├── lib/                    # サービスレイヤー・データレイヤー・共通ロジック
 │   ├── errors.ts            # カスタムエラークラス(ValidationError等。全レイヤーから参照可)
-│   ├── services/            # ビジネスロジック(PhaseService含む)
+│   ├── services/            # ビジネスロジック(CompetitionService/PhaseService含む)
 │   ├── repositories/        # Supabaseアクセス(データレイヤー)
 │   ├── supabase/             # Supabaseクライアント初期化
 │   ├── api/                   # Route Handlers専用の薄いヘルパー(認証チェック等)
@@ -41,7 +57,7 @@ project-root/
 │   ├── integration/
 │   └── e2e/
 ├── docs/                   # プロジェクトドキュメント
-├── scripts/                # Supabaseスキーマ定義・開発補助スクリプト
+├── scripts/                # Supabaseスキーマ定義・マイグレーション・開発補助スクリプト
 └── public/                 # 静的アセット
 ```
 
@@ -49,55 +65,61 @@ project-root/
 
 ### app/ (UIレイヤー + APIレイヤー)
 
-#### app/(参加者向けページ)
+#### app/(グローバルページ) / app/c/[slug]/(参加者向けページ)
 
-**役割**: `docs/ui-design.md` の画面一覧(S-01〜S-04)に対応するページを配置する
+**役割**: `docs/ui-design.md` の画面一覧(S-01〜S-04)に対応するページを、コンペ専用URL `app/c/[slug]/` 配下に配置する。`app/page.tsx`はコンペに紐付かないグローバルなリダイレクト専用ページ
 
 **配置ファイル**:
-- `app/page.tsx`: S-01 トップ画面
-- `app/upload/page.tsx`: S-02 画像投稿画面
-- `app/vote/swipe/page.tsx`: S-03 スワイプ1次選考画面
-- `app/vote/final/page.tsx`: S-04 決選投票画面
+- `app/page.tsx`: グローバルトップ。`GET /api/competitions/active`を呼び、開催中コンペがあれば`/c/{slug}`へ`redirect()`、無ければ案内メッセージを表示するServer Component
+- `app/c/[slug]/layout.tsx`: `CompetitionService.findBySlug(slug)`でコンペを解決するServer Component。存在しなければ`notFound()`、`status`が`closed`なら案内メッセージを表示し、配下のページをレンダリングしない
+- `app/c/[slug]/page.tsx`: S-01 トップ画面
+- `app/c/[slug]/upload/page.tsx`: S-02 画像投稿画面
+- `app/c/[slug]/vote/swipe/page.tsx`: S-03 スワイプ1次選考画面
+- `app/c/[slug]/vote/final/page.tsx`: S-04 決選投票画面
 - `app/layout.tsx`: 全画面共通レイアウト
 - `app/globals.css`: グローバルスタイル(Tailwindのベース)
 
 **命名規則**:
-- Next.js App Routerの規約に従い、ルートは`page.tsx`固定
+- Next.js App Routerの規約に従い、ルートは`page.tsx`固定、動的セグメントは`[slug]`
 - 画面固有のコンポーネントは同一ディレクトリ内に`_components/`を作成して配置してもよい
 
 **依存関係**:
 - 依存可能: `components/`, `lib/client/`, `lib/types/`（`fetch`によるAPIレイヤー呼び出し）
 - 依存禁止: `lib/services/`, `lib/repositories/`（サービス・データレイヤーへの直接アクセス）
+- 例外: `app/page.tsx`と`app/c/[slug]/layout.tsx`はServer Componentとしてコンペ解決のために`lib/services/container.ts`経由で`CompetitionService`を呼び出す（`docs/architecture.md`の管理者画面アクセスガードと同じパターン）
 
 #### app/admin/ (運営向けページ)
 
-**役割**: `docs/ui-design.md` のS-05〜S-07に対応するページを配置する
+**役割**: `docs/ui-design.md` のS-05〜S-08に対応するページを配置する。コンペ横断の一覧・開催は`app/admin/`直下、個別コンペの操作は`app/admin/competitions/[id]/`配下に分ける
 
 **配置ファイル**:
 - `app/admin/login/page.tsx`: S-05 管理者ログイン画面
-- `app/admin/page.tsx`: S-06 管理者ダッシュボード
-- `app/admin/results/page.tsx`: S-07 結果発表画面
+- `app/admin/page.tsx`: S-08 管理者コンペ一覧画面（開催・過去コンペ一覧）
+- `app/admin/competitions/[id]/page.tsx`: S-06 コンペ管理画面
+- `app/admin/competitions/[id]/results/page.tsx`: S-07 結果発表画面
 
 **命名規則**: 参加者向けページと同様
 
 **依存関係**:
 - 依存可能: `components/`, `lib/types/`
 - 依存禁止: `lib/services/`, `lib/repositories/`
+- 例外: S-05以外の各`page.tsx`はServer Componentとして`lib/api/requireAdminSession.ts`の`hasValidAdminSession()`で事前アクセスガードを行う（既存の`/admin`実装パターンを踏襲）
 
 #### app/api/ (APIレイヤー)
 
 **役割**: `docs/functional-design.md` のAPI設計に対応するRoute Handlersを配置する
 
 **配置ファイル**:
-- `app/api/logos/upload-url/route.ts`: `POST /api/logos/upload-url`
-- `app/api/logos/route.ts`: `POST /api/logos`
-- `app/api/logos/route.ts`: `GET /api/logos`
-- `app/api/votes/route.ts`: `POST /api/votes`
-- `app/api/phase/route.ts`: `GET /api/phase`
+- `app/api/competitions/active/route.ts`: `GET /api/competitions/active`
+- `app/api/c/[slug]/logos/upload-url/route.ts`: `POST /api/c/[slug]/logos/upload-url`
+- `app/api/c/[slug]/logos/route.ts`: `POST /api/c/[slug]/logos` / `GET /api/c/[slug]/logos`
+- `app/api/c/[slug]/votes/route.ts`: `POST /api/c/[slug]/votes`
+- `app/api/c/[slug]/phase/route.ts`: `GET /api/c/[slug]/phase`
 - `app/api/admin/login/route.ts`: `POST /api/admin/login`
-- `app/api/admin/phase/route.ts`: `POST /api/admin/phase`
-- `app/api/admin/results/route.ts`: `GET /api/admin/results`
-- `app/api/admin/results/export/route.ts`: `GET /api/admin/results/export`
+- `app/api/admin/competitions/route.ts`: `GET /api/admin/competitions` / `POST /api/admin/competitions`
+- `app/api/admin/competitions/[id]/phase/route.ts`: `POST /api/admin/competitions/[id]/phase`
+- `app/api/admin/competitions/[id]/results/route.ts`: `GET /api/admin/competitions/[id]/results`
+- `app/api/admin/competitions/[id]/results/export/route.ts`: `GET /api/admin/competitions/[id]/results/export`
 
 **命名規則**:
 - Next.js App Routerの規約に従い、ファイル名は`route.ts`固定
@@ -112,7 +134,7 @@ project-root/
 **役割**: 複数の`app/api/**/route.ts`にまたがる横断的な処理のうち、`NextRequest`を直接扱うためサービスレイヤーには置けないものを配置する。ビジネスロジックは持たず、サービスレイヤーの呼び出しに徹する
 
 **配置ファイル**:
-- `requireAdminSession.ts`: Cookieから管理者トークンを取得し`AdminService.verifySession()`へ委譲する共通ヘルパー。`app/api/admin/**/route.ts`の3ハンドラ（phase / results / results/export）が個別に認証チェックを重複実装しないために使う
+- `requireAdminSession.ts`: Cookieから管理者トークンを取得し`AdminService.verifySession()`へ委譲する共通ヘルパー`requireAdminSession()`（`NextRequest`用、`app/api/admin/**/route.ts`の各ハンドラが個別に認証チェックを重複実装しないために使う）と、Server Component用の`hasValidAdminSession()`（`next/headers`の`cookies()`を使用し、`app/admin/page.tsx`・`app/admin/competitions/[id]/**/page.tsx`の事前アクセスガードに使う）の2つをエクスポートする
 
 **命名規則**: camelCase、動詞で始める（`lib/algorithms/`と同様の関数ファイル規約）
 
@@ -125,7 +147,7 @@ project-root/
 **役割**: `docs/ui-design.md` の共通コンポーネント一覧に対応するReactコンポーネントを配置する
 
 **配置ファイル**:
-- `Button.tsx`, `Input.tsx`, `Textarea.tsx`, `Toast.tsx`, `ProgressBar.tsx`, `Badge.tsx`, `ConfirmDialog.tsx`, `SwipeCard.tsx`, `SelectableGrid.tsx`, `QRCodeDisplay.tsx`（画面固有, S-06）, `RankingList.tsx`（画面固有, S-07）
+- `Button.tsx`, `Input.tsx`, `Textarea.tsx`, `Toast.tsx`, `ProgressBar.tsx`, `Badge.tsx`, `ConfirmDialog.tsx`, `SwipeCard.tsx`, `SelectableGrid.tsx`, `QRCodeDisplay.tsx`（画面固有, S-06/S-08）, `RankingList.tsx`（画面固有, S-07。発表開始前の静的表示用）, `AnimatedRankingList.tsx`（画面固有, S-07。`framer-motion`によるスライドイン・カウントアップ演出用）, `CompetitionCard.tsx`（画面固有, S-08）
 
 **命名規則**:
 - PascalCase（例: `SwipeCard.tsx`）
@@ -140,8 +162,8 @@ project-root/
 **役割**: `docs/functional-design.md` のコンポーネント設計で定義したビジネスロジックを実装する
 
 **配置ファイル**:
-- `UploadService.ts`, `VoteService.ts`, `AdminService.ts`, `PhaseService.ts`
-- `container.ts`: 各サービスとRepositoryを組み立てて返すDIファクトリ（`app/api/`から利用し、Route Handlerを薄く保つ）
+- `CompetitionService.ts`, `UploadService.ts`, `VoteService.ts`, `AdminService.ts`, `PhaseService.ts`
+- `container.ts`: 各サービスとRepositoryを組み立てて返すDIファクトリ（`app/api/`・Server Componentのページから利用し、呼び出し側を薄く保つ）
 
 **命名規則**: PascalCase + `Service`接尾辞（`container.ts`のみ例外）
 
@@ -152,6 +174,7 @@ project-root/
 **例**:
 ```
 lib/services/
+├── CompetitionService.ts
 ├── UploadService.ts
 ├── VoteService.ts
 ├── AdminService.ts
@@ -163,7 +186,7 @@ lib/services/
 **役割**: Supabase Database/Storageへのアクセスをカプセル化する。`LogoRepository`は画像アップロード用の署名付きURL発行・Storageオブジェクト削除も担い、`UploadService`を含むサービスレイヤーがSupabaseクライアントへ直接アクセスしないようにする
 
 **配置ファイル**:
-- `LogoRepository.ts`, `VoteRepository.ts`, `AppSettingsRepository.ts`
+- `CompetitionRepository.ts`（旧`AppSettingsRepository.ts`を置き換え。コンペのCRUD・slug解決・フェーズ更新を担う）, `LogoRepository.ts`, `VoteRepository.ts`
 
 **命名規則**: PascalCase + `Repository`接尾辞
 
@@ -232,10 +255,10 @@ lib/client/
 
 ### lib/types/ (型定義)
 
-**役割**: `docs/functional-design.md` のデータモデル定義(`Logo` / `Vote` / `AppSettings`等)をTypeScriptの型として配置する
+**役割**: `docs/functional-design.md` のデータモデル定義(`Competition` / `Logo` / `Vote`等)をTypeScriptの型として配置する
 
 **配置ファイル**:
-- `Logo.ts`, `Vote.ts`, `AppSettings.ts`, `RankedLogo.ts`（結果発表のランキング表示用。`Logo`を拡張し`voteCount`/`rank`/`isTiedForRunoff`を追加）
+- `Competition.ts`（`EventPhase`/`CompetitionStatus`を含む。旧`AppSettings.ts`を置き換え）, `Logo.ts`, `Vote.ts`, `RankedLogo.ts`（結果発表のランキング表示用。`Logo`を拡張し`voteCount`/`rank`/`isTiedForRunoff`を追加）
 
 **命名規則**: PascalCase（エンティティ名と一致させる）
 
@@ -313,14 +336,19 @@ tests/e2e/
 ### scripts/ (スクリプトディレクトリ)
 
 **配置ファイル**:
-- Supabaseの`logos` / `votes` / `vote_locks` / `app_settings`テーブル作成用SQL
+- `schema.sql`: 新規Supabaseプロジェクトへのフルインストール用（`competitions` / `logos` / `votes` / `vote_locks`テーブル作成用SQL。最終形であり`app_settings`は含まない）
+- `migrations/`: 既存データを持つ環境向けの、既存スキーマからの変更差分SQL（コンペ機能導入時の`0001_add_competitions.sql`等。`docs/architecture.md`のマイグレーション戦略を参照）
 - 開発補助スクリプト（例: ローカル環境でのシード投入）
+
+**命名規則（`scripts/migrations/`）**: `[4桁連番]_[変更内容をsnake_case].sql`（例: `0001_add_competitions.sql`）。連番順に適用する前提とし、適用済みマイグレーションは書き換えない
 
 **例**:
 ```
 scripts/
-├── schema.sql              # テーブル作成用SQL
-└── seed.ts                 # 開発用ダミーデータ投入
+├── schema.sql                          # 新規インストール用スキーマ(最終形)
+├── migrations/
+│   └── 0001_add_competitions.sql       # 既存環境へのコンペ機能追加差分
+└── seed.ts                             # 開発用ダミーデータ投入
 ```
 
 ### public/ (静的アセット)
@@ -333,8 +361,8 @@ scripts/
 
 | ファイル種別 | 配置先 | 命名規則 | 例 |
 |------------|--------|---------|-----|
-| ページ(UIレイヤー) | `app/**/page.tsx` | Next.js規約(`page.tsx`固定) | `app/upload/page.tsx` |
-| APIエンドポイント | `app/api/**/route.ts` | Next.js規約(`route.ts`固定) | `app/api/votes/route.ts` |
+| ページ(UIレイヤー) | `app/**/page.tsx` | Next.js規約(`page.tsx`固定) | `app/c/[slug]/upload/page.tsx` |
+| APIエンドポイント | `app/api/**/route.ts` | Next.js規約(`route.ts`固定) | `app/api/c/[slug]/votes/route.ts` |
 | 共通UIコンポーネント | `components/` | PascalCase | `SwipeCard.tsx` |
 | サービスクラス | `lib/services/` | PascalCase + `Service` | `VoteService.ts` |
 | リポジトリクラス | `lib/repositories/` | PascalCase + `Repository` | `VoteRepository.ts` |
@@ -370,7 +398,7 @@ scripts/
 ### ディレクトリ名
 
 - **レイヤーディレクトリ**: 複数形、kebab-case（例: `services/`, `repositories/`）
-- **画面ディレクトリ(app/配下)**: Next.jsのルーティングに従い、URLパスと一致させる（例: `vote/swipe/`, `admin/results/`）
+- **画面ディレクトリ(app/配下)**: Next.jsのルーティングに従い、URLパスと一致させる（例: `c/[slug]/vote/swipe/`, `admin/competitions/[id]/results/`）
 
 ### ファイル名
 
@@ -412,11 +440,11 @@ lib/repositories/      → lib/supabase/, lib/types/
 
 - **小規模機能**: 既存の`lib/services/`, `app/api/`に追記
 - **中規模機能**（例: 副賞カテゴリ機能を追加する場合）: `lib/services/awards/`のようにサブディレクトリを作成
-- **大規模機能**（例: 別イベント向けの再利用を本格化する場合）: マルチテナント化を見据えた`lib/services/events/`等への再構成を検討（現時点ではスコープ外）
+- **大規模機能**（例: 複数コンペを真に同時並行運用できるようにする場合）: 常に1件のみactiveという現在の制約を前提に組まれた`CompetitionRepository`の部分ユニークインデックス・`AdminService`の呼び出し規約を見直す必要があり、`lib/services/competitions/`等への再構成を検討（現時点ではPRDのスコープ外）
 
 ### ファイルサイズの管理
 
-- 1ファイル300行以下を推奨。特に`app/api/admin/results/route.ts`のような集計処理は、300行を超える場合`lib/services/AdminService.ts`側にロジックを移し、Route Handler側は薄く保つ
+- 1ファイル300行以下を推奨。特に`app/api/admin/competitions/[id]/results/route.ts`のような集計処理は、300行を超える場合`lib/services/AdminService.ts`側にロジックを移し、Route Handler側は薄く保つ
 
 ## 特殊ディレクトリ
 

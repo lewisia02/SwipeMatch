@@ -4,6 +4,8 @@ import type { VoteRepository } from '@/lib/repositories/VoteRepository';
 import type { PhaseService } from '@/lib/services/PhaseService';
 import { VoteService } from '@/lib/services/VoteService';
 
+const COMPETITION_ID = 'competition-1';
+
 function createMockVoteRepository(options: { reserved?: boolean; existingVoteCount?: number } = {}) {
   const { reserved = true, existingVoteCount = 0 } = options;
   return {
@@ -30,12 +32,12 @@ describe('VoteService', () => {
       const phaseService = createMockPhaseService();
       const service = new VoteService(voteRepository, phaseService);
 
-      await service.submitVotes('anon-1', ['logo-1', 'logo-2']);
+      await service.submitVotes(COMPETITION_ID, 'anon-1', ['logo-1', 'logo-2']);
 
-      expect(voteRepository.reserveVoteSlot).toHaveBeenCalledWith('anon-1');
+      expect(voteRepository.reserveVoteSlot).toHaveBeenCalledWith(COMPETITION_ID, 'anon-1');
       expect(voteRepository.createMany).toHaveBeenCalledWith([
-        { logoId: 'logo-1', voterAnonId: 'anon-1' },
-        { logoId: 'logo-2', voterAnonId: 'anon-1' },
+        { competitionId: COMPETITION_ID, logoId: 'logo-1', voterAnonId: 'anon-1' },
+        { competitionId: COMPETITION_ID, logoId: 'logo-2', voterAnonId: 'anon-1' },
       ]);
     });
 
@@ -44,7 +46,9 @@ describe('VoteService', () => {
       const phaseService = createMockPhaseService(true);
       const service = new VoteService(voteRepository, phaseService);
 
-      await expect(service.submitVotes('anon-1', ['logo-1'])).rejects.toThrow(PhaseMismatchError);
+      await expect(service.submitVotes(COMPETITION_ID, 'anon-1', ['logo-1'])).rejects.toThrow(
+        PhaseMismatchError,
+      );
       expect(voteRepository.reserveVoteSlot).not.toHaveBeenCalled();
       expect(voteRepository.createMany).not.toHaveBeenCalled();
     });
@@ -54,7 +58,9 @@ describe('VoteService', () => {
       const phaseService = createMockPhaseService();
       const service = new VoteService(voteRepository, phaseService);
 
-      await expect(service.submitVotes('anon-1', ['logo-1'])).rejects.toThrow(DuplicateVoteError);
+      await expect(service.submitVotes(COMPETITION_ID, 'anon-1', ['logo-1'])).rejects.toThrow(
+        DuplicateVoteError,
+      );
       expect(voteRepository.createMany).not.toHaveBeenCalled();
     });
 
@@ -64,8 +70,10 @@ describe('VoteService', () => {
       const phaseService = createMockPhaseService();
       const service = new VoteService(voteRepository, phaseService);
 
-      await expect(service.submitVotes('anon-1', ['logo-1'])).rejects.toThrow('DB接続エラー');
-      expect(voteRepository.releaseVoteSlot).toHaveBeenCalledWith('anon-1');
+      await expect(service.submitVotes(COMPETITION_ID, 'anon-1', ['logo-1'])).rejects.toThrow(
+        'DB接続エラー',
+      );
+      expect(voteRepository.releaseVoteSlot).toHaveBeenCalledWith(COMPETITION_ID, 'anon-1');
     });
   });
 
@@ -75,7 +83,7 @@ describe('VoteService', () => {
       const phaseService = createMockPhaseService();
       const service = new VoteService(voteRepository, phaseService);
 
-      await expect(service.hasAlreadyVoted('anon-1')).resolves.toBe(true);
+      await expect(service.hasAlreadyVoted(COMPETITION_ID, 'anon-1')).resolves.toBe(true);
     });
 
     it('投票済みレコードがない場合、falseを返す', async () => {
@@ -83,7 +91,7 @@ describe('VoteService', () => {
       const phaseService = createMockPhaseService();
       const service = new VoteService(voteRepository, phaseService);
 
-      await expect(service.hasAlreadyVoted('anon-1')).resolves.toBe(false);
+      await expect(service.hasAlreadyVoted(COMPETITION_ID, 'anon-1')).resolves.toBe(false);
     });
   });
 });

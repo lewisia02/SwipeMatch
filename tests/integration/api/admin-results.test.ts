@@ -3,17 +3,28 @@ import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TEST_SECRET = 'test-admin-session-secret-value';
+const COMPETITION_ID = 'competition-1';
 
-const mockAppSettings = { currentPhase: 'results' as 'submission' | 'voting' | 'results' };
+const mockCompetition = { currentPhase: 'results' as 'submission' | 'voting' | 'results' };
 
-vi.mock('@/lib/repositories/AppSettingsRepository', () => {
+function buildCompetition() {
   return {
-    AppSettingsRepository: vi.fn().mockImplementation(() => ({
-      get: vi.fn().mockImplementation(async () => ({
-        id: 'singleton',
-        currentPhase: mockAppSettings.currentPhase,
-        updatedAt: new Date(),
-      })),
+    id: COMPETITION_ID,
+    slug: 'x7k2p9',
+    title: 'テストコンペ',
+    status: 'active' as const,
+    currentPhase: mockCompetition.currentPhase,
+    createdAt: new Date('2026-07-18T00:00:00.000Z'),
+    closedAt: null,
+  };
+}
+
+vi.mock('@/lib/repositories/CompetitionRepository', () => {
+  return {
+    CompetitionRepository: vi.fn().mockImplementation(() => ({
+      findById: vi.fn().mockImplementation(async (id: string) =>
+        id === COMPETITION_ID ? buildCompetition() : null,
+      ),
       updatePhase: vi.fn(),
     })),
   };
@@ -22,9 +33,10 @@ vi.mock('@/lib/repositories/AppSettingsRepository', () => {
 vi.mock('@/lib/repositories/LogoRepository', () => {
   return {
     LogoRepository: vi.fn().mockImplementation(() => ({
-      findAll: vi.fn().mockResolvedValue([
+      findAllByCompetitionId: vi.fn().mockResolvedValue([
         {
           id: 'logo-1',
+          competitionId: COMPETITION_ID,
           imageUrl: 'https://example.com/logos/1.jpg',
           uploaderName: '山田太郎',
           memo: 'メモ1',
@@ -32,6 +44,7 @@ vi.mock('@/lib/repositories/LogoRepository', () => {
         },
         {
           id: 'logo-2',
+          competitionId: COMPETITION_ID,
           imageUrl: 'https://example.com/logos/2.jpg',
           uploaderName: '佐藤花子',
           memo: 'メモ2',
@@ -59,8 +72,10 @@ vi.mock('@/lib/repositories/VoteRepository', () => {
   };
 });
 
-const { GET: getResults } = await import('@/app/api/admin/results/route');
-const { GET: getResultsExport } = await import('@/app/api/admin/results/export/route');
+const { GET: getResults } = await import('@/app/api/admin/competitions/[id]/results/route');
+const { GET: getResultsExport } = await import(
+  '@/app/api/admin/competitions/[id]/results/export/route'
+);
 
 async function buildValidToken(): Promise<string> {
   return new SignJWT({ role: 'admin' })
@@ -76,10 +91,14 @@ function resultsRequest(url: string, cookie?: string) {
   });
 }
 
-describe('GET /api/admin/results', () => {
+function idParams(id = COMPETITION_ID) {
+  return { params: Promise.resolve({ id }) };
+}
+
+describe('GET /api/admin/competitions/[id]/results', () => {
   beforeEach(() => {
     vi.stubEnv('ADMIN_SESSION_SECRET', TEST_SECRET);
-    mockAppSettings.currentPhase = 'results';
+    mockCompetition.currentPhase = 'results';
   });
 
   afterEach(() => {
@@ -87,17 +106,38 @@ describe('GET /api/admin/results', () => {
   });
 
   it('Cookieが存在しない場合、401を返す', async () => {
-    const response = await getResults(resultsRequest('http://localhost/api/admin/results'));
+    const response = await getResults(
+      resultsRequest(`http://localhost/api/admin/competitions/${COMPETITION_ID}/results`),
+      idParams(),
+    );
 
     expect(response.status).toBe(401);
   });
 
-  it('resultsフェーズでない場合、403を返す', async () => {
-    mockAppSettings.currentPhase = 'voting';
+  it('存在しないコンペIDの場合、404を返す', async () => {
     const token = await buildValidToken();
 
     const response = await getResults(
-      resultsRequest('http://localhost/api/admin/results', `admin_token=${token}`),
+      resultsRequest(
+        `http://localhost/api/admin/competitions/unknown/results`,
+        `admin_token=${token}`,
+      ),
+      idParams('unknown'),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it('resultsフェーズでない場合、403を返す', async () => {
+    mockCompetition.currentPhase = 'voting';
+    const token = await buildValidToken();
+
+    const response = await getResults(
+      resultsRequest(
+        `http://localhost/api/admin/competitions/${COMPETITION_ID}/results`,
+        `admin_token=${token}`,
+      ),
+      idParams(),
     );
 
     expect(response.status).toBe(403);
@@ -107,7 +147,11 @@ describe('GET /api/admin/results', () => {
     const token = await buildValidToken();
 
     const response = await getResults(
-      resultsRequest('http://localhost/api/admin/results', `admin_token=${token}`),
+      resultsRequest(
+        `http://localhost/api/admin/competitions/${COMPETITION_ID}/results`,
+        `admin_token=${token}`,
+      ),
+      idParams(),
     );
 
     expect(response.status).toBe(200);
@@ -117,10 +161,10 @@ describe('GET /api/admin/results', () => {
   });
 });
 
-describe('GET /api/admin/results/export', () => {
+describe('GET /api/admin/competitions/[id]/results/export', () => {
   beforeEach(() => {
     vi.stubEnv('ADMIN_SESSION_SECRET', TEST_SECRET);
-    mockAppSettings.currentPhase = 'results';
+    mockCompetition.currentPhase = 'results';
   });
 
   afterEach(() => {
@@ -129,18 +173,23 @@ describe('GET /api/admin/results/export', () => {
 
   it('Cookieが存在しない場合、401を返す', async () => {
     const response = await getResultsExport(
-      resultsRequest('http://localhost/api/admin/results/export'),
+      resultsRequest(`http://localhost/api/admin/competitions/${COMPETITION_ID}/results/export`),
+      idParams(),
     );
 
     expect(response.status).toBe(401);
   });
 
   it('resultsフェーズでない場合、403を返す', async () => {
-    mockAppSettings.currentPhase = 'voting';
+    mockCompetition.currentPhase = 'voting';
     const token = await buildValidToken();
 
     const response = await getResultsExport(
-      resultsRequest('http://localhost/api/admin/results/export', `admin_token=${token}`),
+      resultsRequest(
+        `http://localhost/api/admin/competitions/${COMPETITION_ID}/results/export`,
+        `admin_token=${token}`,
+      ),
+      idParams(),
     );
 
     expect(response.status).toBe(403);
@@ -150,7 +199,11 @@ describe('GET /api/admin/results/export', () => {
     const token = await buildValidToken();
 
     const response = await getResultsExport(
-      resultsRequest('http://localhost/api/admin/results/export', `admin_token=${token}`),
+      resultsRequest(
+        `http://localhost/api/admin/competitions/${COMPETITION_ID}/results/export`,
+        `admin_token=${token}`,
+      ),
+      idParams(),
     );
 
     expect(response.status).toBe(200);

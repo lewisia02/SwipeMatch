@@ -3,6 +3,7 @@ import type { Vote } from '@/lib/types/Vote';
 
 interface VoteRow {
   id: string;
+  competition_id: string;
   logo_id: string;
   voter_anon_id: string;
   created_at: string;
@@ -11,6 +12,7 @@ interface VoteRow {
 function toVote(row: VoteRow): Vote {
   return {
     id: row.id,
+    competitionId: row.competition_id,
     logoId: row.logo_id,
     voterAnonId: row.voter_anon_id,
     createdAt: new Date(row.created_at),
@@ -20,11 +22,14 @@ function toVote(row: VoteRow): Vote {
 const UNIQUE_VIOLATION_CODE = '23505';
 
 export class VoteRepository {
-  // vote_locksテーブルのPRIMARY KEY制約により、同一anonIdからの同時リクエストでも
-  // どちらか一方のみがtrueを受け取ることをDB側で保証する（TOCTOUレース対策）
-  async reserveVoteSlot(anonId: string): Promise<boolean> {
+  // vote_locksテーブルの複合PRIMARY KEY（competition_id, voter_anon_id）制約により、
+  // 同一コンペ・同一anonIdからの同時リクエストでもどちらか一方のみがtrueを受け取ることを
+  // DB側で保証する（TOCTOUレース対策）。別コンペでは同じanonIdでも独立して予約できる
+  async reserveVoteSlot(competitionId: string, anonId: string): Promise<boolean> {
     const supabase = getSupabaseClient();
-    const { error } = await supabase.from('vote_locks').insert({ voter_anon_id: anonId });
+    const { error } = await supabase
+      .from('vote_locks')
+      .insert({ competition_id: competitionId, voter_anon_id: anonId });
 
     if (!error) {
       return true;
@@ -36,9 +41,13 @@ export class VoteRepository {
   }
 
   // Vote作成が失敗した場合に予約を取り消し、再投票を可能にする補償処理用
-  async releaseVoteSlot(anonId: string): Promise<void> {
+  async releaseVoteSlot(competitionId: string, anonId: string): Promise<void> {
     const supabase = getSupabaseClient();
-    const { error } = await supabase.from('vote_locks').delete().eq('voter_anon_id', anonId);
+    const { error } = await supabase
+      .from('vote_locks')
+      .delete()
+      .eq('competition_id', competitionId)
+      .eq('voter_anon_id', anonId);
 
     if (error) {
       throw new Error(`投票枠の解放に失敗しました: ${error.message}`);
@@ -49,7 +58,13 @@ export class VoteRepository {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('votes')
-      .insert(votes.map((vote) => ({ logo_id: vote.logoId, voter_anon_id: vote.voterAnonId })))
+      .insert(
+        votes.map((vote) => ({
+          competition_id: vote.competitionId,
+          logo_id: vote.logoId,
+          voter_anon_id: vote.voterAnonId,
+        })),
+      )
       .select();
 
     if (error) {
@@ -59,11 +74,12 @@ export class VoteRepository {
     return (data as VoteRow[]).map(toVote);
   }
 
-  async countByAnonId(anonId: string): Promise<number> {
+  async countByAnonId(competitionId: string, anonId: string): Promise<number> {
     const supabase = getSupabaseClient();
     const { count, error } = await supabase
       .from('votes')
       .select('*', { count: 'exact', head: true })
+      .eq('competition_id', competitionId)
       .eq('voter_anon_id', anonId);
 
     if (error) {
@@ -73,9 +89,12 @@ export class VoteRepository {
     return count ?? 0;
   }
 
-  async countByLogoId(): Promise<Record<string, number>> {
+  async countByLogoId(competitionId: string): Promise<Record<string, number>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase.from('votes').select('logo_id');
+    const { data, error } = await supabase
+      .from('votes')
+      .select('logo_id')
+      .eq('competition_id', competitionId);
 
     if (error) {
       throw new Error(`得票数の集計に失敗しました: ${error.message}`);

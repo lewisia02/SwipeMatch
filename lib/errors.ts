@@ -1,4 +1,4 @@
-import type { EventPhase } from './types/AppSettings';
+import type { EventPhase } from './types/Competition';
 
 export class ValidationError extends Error {
   constructor(
@@ -31,5 +31,12 @@ export class UnauthorizedError extends Error {
   constructor() {
     super('認証が必要です');
     this.name = 'UnauthorizedError';
+  }
+}
+
+export class NotFoundError extends Error {
+  constructor(message = '対象が見つかりません') {
+    super(message);
+    this.name = 'NotFoundError';
   }
 }

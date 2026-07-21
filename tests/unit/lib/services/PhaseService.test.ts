@@ -1,34 +1,55 @@
 import { describe, expect, it, vi } from 'vitest';
-import { PhaseMismatchError, ValidationError } from '@/lib/errors';
-import type { AppSettingsRepository } from '@/lib/repositories/AppSettingsRepository';
+import { NotFoundError, PhaseMismatchError, ValidationError } from '@/lib/errors';
+import type { CompetitionRepository } from '@/lib/repositories/CompetitionRepository';
 import { PhaseService } from '@/lib/services/PhaseService';
-import type { AppSettings } from '@/lib/types/AppSettings';
+import type { Competition, EventPhase } from '@/lib/types/Competition';
 
-function createMockRepository(currentPhase: AppSettings['currentPhase']) {
+const COMPETITION_ID = 'competition-1';
+
+function createMockRepository(currentPhase: EventPhase | null) {
   return {
-    get: vi.fn().mockResolvedValue({
-      id: 'singleton',
-      currentPhase,
-      updatedAt: new Date(),
-    } satisfies AppSettings),
+    findById: vi.fn().mockResolvedValue(
+      currentPhase === null
+        ? null
+        : ({
+            id: COMPETITION_ID,
+            slug: 'x7k2p9',
+            title: 'テストコンペ',
+            status: 'active',
+            currentPhase,
+            createdAt: new Date(),
+            closedAt: null,
+          } satisfies Competition),
+    ),
     updatePhase: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AppSettingsRepository;
+  } as unknown as CompetitionRepository;
 }
 
 describe('PhaseService', () => {
+  describe('getCurrentPhase', () => {
+    it('コンペが存在しない場合、NotFoundErrorをスローする', async () => {
+      const repository = createMockRepository(null);
+      const service = new PhaseService(repository);
+
+      await expect(service.getCurrentPhase(COMPETITION_ID)).rejects.toThrow(NotFoundError);
+    });
+  });
+
   describe('assertPhase', () => {
     it('現在のフェーズが期待通りの場合、何もスローしない', async () => {
       const repository = createMockRepository('submission');
       const service = new PhaseService(repository);
 
-      await expect(service.assertPhase('submission')).resolves.toBeUndefined();
+      await expect(service.assertPhase(COMPETITION_ID, 'submission')).resolves.toBeUndefined();
     });
 
     it('現在のフェーズが期待と異なる場合、PhaseMismatchErrorをスローする', async () => {
       const repository = createMockRepository('voting');
       const service = new PhaseService(repository);
 
-      await expect(service.assertPhase('submission')).rejects.toThrow(PhaseMismatchError);
+      await expect(service.assertPhase(COMPETITION_ID, 'submission')).rejects.toThrow(
+        PhaseMismatchError,
+      );
     });
   });
 
@@ -37,16 +58,18 @@ describe('PhaseService', () => {
       const repository = createMockRepository('submission');
       const service = new PhaseService(repository);
 
-      await service.transitionTo('voting');
+      await service.transitionTo(COMPETITION_ID, 'voting');
 
-      expect(repository.updatePhase).toHaveBeenCalledWith('voting');
+      expect(repository.updatePhase).toHaveBeenCalledWith(COMPETITION_ID, 'voting');
     });
 
     it('逆行遷移はValidationErrorをスローする', async () => {
       const repository = createMockRepository('results');
       const service = new PhaseService(repository);
 
-      await expect(service.transitionTo('submission')).rejects.toThrow(ValidationError);
+      await expect(service.transitionTo(COMPETITION_ID, 'submission')).rejects.toThrow(
+        ValidationError,
+      );
       expect(repository.updatePhase).not.toHaveBeenCalled();
     });
 
@@ -54,7 +77,9 @@ describe('PhaseService', () => {
       const repository = createMockRepository('voting');
       const service = new PhaseService(repository);
 
-      await expect(service.transitionTo('voting')).rejects.toThrow(ValidationError);
+      await expect(service.transitionTo(COMPETITION_ID, 'voting')).rejects.toThrow(
+        ValidationError,
+      );
     });
   });
 });

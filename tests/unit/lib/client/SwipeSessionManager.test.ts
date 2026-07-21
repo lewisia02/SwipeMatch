@@ -19,6 +19,7 @@ function createFakeLocalStorage() {
 function createLogos(count: number): Logo[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `logo-${i}`,
+    competitionId: 'competition-1',
     imageUrl: `https://example.com/logo-${i}.jpg`,
     uploaderName: '',
     memo: `メモ${i}`,
@@ -39,7 +40,7 @@ describe('SwipeSessionManager', () => {
 
   it('新規セッションでは全Logoがorderに含まれる', () => {
     const logos = createLogos(5);
-    const manager = new SwipeSessionManager(logos);
+    const manager = new SwipeSessionManager('competition-1', logos);
 
     expect(manager.getTotalCount()).toBe(5);
     expect(manager.getRemainingCount()).toBe(5);
@@ -48,7 +49,7 @@ describe('SwipeSessionManager', () => {
 
   it('recordDecisionでkeepしたLogoがgetKeptLogosに含まれる', () => {
     const logos = createLogos(3);
-    const manager = new SwipeSessionManager(logos);
+    const manager = new SwipeSessionManager('competition-1', logos);
 
     const first = manager.getCurrentLogo();
     expect(first).toBeDefined();
@@ -61,7 +62,7 @@ describe('SwipeSessionManager', () => {
 
   it('skipしたLogoはgetKeptLogosに含まれない', () => {
     const logos = createLogos(2);
-    const manager = new SwipeSessionManager(logos);
+    const manager = new SwipeSessionManager('competition-1', logos);
 
     const first = manager.getCurrentLogo();
     manager.recordDecision(first!.id, 'skip');
@@ -71,7 +72,7 @@ describe('SwipeSessionManager', () => {
 
   it('全件仕分けするとisCompleteがtrueになる', () => {
     const logos = createLogos(2);
-    const manager = new SwipeSessionManager(logos);
+    const manager = new SwipeSessionManager('competition-1', logos);
 
     manager.recordDecision(manager.getCurrentLogo()!.id, 'keep');
     manager.recordDecision(manager.getCurrentLogo()!.id, 'skip');
@@ -82,11 +83,11 @@ describe('SwipeSessionManager', () => {
 
   it('同じlocalStorageを共有する新しいインスタンスはセッションを復元する', () => {
     const logos = createLogos(3);
-    const first = new SwipeSessionManager(logos);
+    const first = new SwipeSessionManager('competition-1', logos);
     const firstLogo = first.getCurrentLogo();
     first.recordDecision(firstLogo!.id, 'keep');
 
-    const second = new SwipeSessionManager(logos);
+    const second = new SwipeSessionManager('competition-1', logos);
 
     expect(second.getRemainingCount()).toBe(2);
     expect(second.getKeptLogos().map((l) => l.id)).toEqual([firstLogo!.id]);
@@ -94,13 +95,24 @@ describe('SwipeSessionManager', () => {
 
   it('Logo構成が変わった場合は新規セッションとして再シャッフルする', () => {
     const logos = createLogos(3);
-    const first = new SwipeSessionManager(logos);
+    const first = new SwipeSessionManager('competition-1', logos);
     first.recordDecision(first.getCurrentLogo()!.id, 'keep');
 
     const differentLogos = createLogos(4);
-    const second = new SwipeSessionManager(differentLogos);
+    const second = new SwipeSessionManager('competition-1', differentLogos);
 
     expect(second.getTotalCount()).toBe(4);
     expect(second.getRemainingCount()).toBe(4);
+  });
+
+  it('別のcompetitionIdでは独立したセッションとして扱われる', () => {
+    const logos = createLogos(3);
+    const first = new SwipeSessionManager('competition-1', logos);
+    first.recordDecision(first.getCurrentLogo()!.id, 'keep');
+
+    const second = new SwipeSessionManager('competition-2', logos);
+
+    expect(second.getKeptLogos()).toHaveLength(0);
+    expect(second.getRemainingCount()).toBe(3);
   });
 });

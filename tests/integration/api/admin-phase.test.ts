@@ -3,25 +3,37 @@ import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TEST_SECRET = 'test-admin-session-secret-value';
+const COMPETITION_ID = 'competition-1';
 
-const mockAppSettings = { currentPhase: 'submission' as 'submission' | 'voting' | 'results' };
+const mockCompetition = { currentPhase: 'submission' as 'submission' | 'voting' | 'results' };
 
-vi.mock('@/lib/repositories/AppSettingsRepository', () => {
+function buildCompetition() {
   return {
-    AppSettingsRepository: vi.fn().mockImplementation(() => ({
-      get: vi.fn().mockImplementation(async () => ({
-        id: 'singleton',
-        currentPhase: mockAppSettings.currentPhase,
-        updatedAt: new Date(),
-      })),
-      updatePhase: vi.fn().mockImplementation(async (phase: string) => {
-        mockAppSettings.currentPhase = phase as never;
+    id: COMPETITION_ID,
+    slug: 'x7k2p9',
+    title: 'テストコンペ',
+    status: 'active' as const,
+    currentPhase: mockCompetition.currentPhase,
+    createdAt: new Date('2026-07-18T00:00:00.000Z'),
+    closedAt: null,
+  };
+}
+
+vi.mock('@/lib/repositories/CompetitionRepository', () => {
+  return {
+    CompetitionRepository: vi.fn().mockImplementation(() => ({
+      findById: vi.fn().mockImplementation(async (id: string) =>
+        id === COMPETITION_ID ? buildCompetition() : null,
+      ),
+      updatePhase: vi.fn().mockImplementation(async (_id: string, phase: string) => {
+        mockCompetition.currentPhase = phase as never;
+        return buildCompetition();
       }),
     })),
   };
 });
 
-const { POST: postPhase } = await import('@/app/api/admin/phase/route');
+const { POST: postPhase } = await import('@/app/api/admin/competitions/[id]/phase/route');
 
 async function buildValidToken(): Promise<string> {
   return new SignJWT({ role: 'admin' })
@@ -32,7 +44,7 @@ async function buildValidToken(): Promise<string> {
 }
 
 function phaseRequest(body: unknown, cookie?: string) {
-  return new NextRequest('http://localhost/api/admin/phase', {
+  return new NextRequest(`http://localhost/api/admin/competitions/${COMPETITION_ID}/phase`, {
     method: 'POST',
     body: JSON.stringify(body),
     headers: {
@@ -42,10 +54,14 @@ function phaseRequest(body: unknown, cookie?: string) {
   });
 }
 
-describe('POST /api/admin/phase', () => {
+function idParams(id = COMPETITION_ID) {
+  return { params: Promise.resolve({ id }) };
+}
+
+describe('POST /api/admin/competitions/[id]/phase', () => {
   beforeEach(() => {
     vi.stubEnv('ADMIN_SESSION_SECRET', TEST_SECRET);
-    mockAppSettings.currentPhase = 'submission';
+    mockCompetition.currentPhase = 'submission';
   });
 
   afterEach(() => {
@@ -53,17 +69,29 @@ describe('POST /api/admin/phase', () => {
   });
 
   it('Cookieが存在しない場合、401を返す', async () => {
-    const response = await postPhase(phaseRequest({ phase: 'voting' }));
+    const response = await postPhase(phaseRequest({ phase: 'voting' }), idParams());
 
     expect(response.status).toBe(401);
   });
 
+  it('存在しないコンペIDの場合、404を返す', async () => {
+    const token = await buildValidToken();
+
+    const response = await postPhase(
+      phaseRequest({ phase: 'voting' }, `admin_token=${token}`),
+      idParams('unknown'),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
   it('逆行遷移の場合、400を返す', async () => {
-    mockAppSettings.currentPhase = 'results';
+    mockCompetition.currentPhase = 'results';
     const token = await buildValidToken();
 
     const response = await postPhase(
       phaseRequest({ phase: 'submission' }, `admin_token=${token}`),
+      idParams(),
     );
 
     expect(response.status).toBe(400);
@@ -72,16 +100,22 @@ describe('POST /api/admin/phase', () => {
   it('前方への遷移の場合、200を返しフェーズが切り替わる', async () => {
     const token = await buildValidToken();
 
-    const response = await postPhase(phaseRequest({ phase: 'voting' }, `admin_token=${token}`));
+    const response = await postPhase(
+      phaseRequest({ phase: 'voting' }, `admin_token=${token}`),
+      idParams(),
+    );
 
     expect(response.status).toBe(200);
-    expect(mockAppSettings.currentPhase).toBe('voting');
+    expect(mockCompetition.currentPhase).toBe('voting');
   });
 
   it('不正なフェーズ値の場合、400を返す', async () => {
     const token = await buildValidToken();
 
-    const response = await postPhase(phaseRequest({ phase: 'unknown' }, `admin_token=${token}`));
+    const response = await postPhase(
+      phaseRequest({ phase: 'unknown' }, `admin_token=${token}`),
+      idParams(),
+    );
 
     expect(response.status).toBe(400);
   });

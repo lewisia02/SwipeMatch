@@ -1,17 +1,35 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAppSettings = { currentPhase: 'submission' as 'submission' | 'voting' | 'results' };
+const SLUG = 'x7k2p9';
+const COMPETITION_ID = 'competition-1';
 
-vi.mock('@/lib/repositories/AppSettingsRepository', () => {
+const mockCompetition = {
+  status: 'active' as 'active' | 'closed',
+  currentPhase: 'submission' as 'submission' | 'voting' | 'results',
+};
+
+function buildCompetition() {
   return {
-    AppSettingsRepository: vi.fn().mockImplementation(() => ({
-      get: vi.fn().mockImplementation(async () => ({
-        id: 'singleton',
-        currentPhase: mockAppSettings.currentPhase,
-        updatedAt: new Date(),
-      })),
-      updatePhase: vi.fn(),
+    id: COMPETITION_ID,
+    slug: SLUG,
+    title: 'テストコンペ',
+    status: mockCompetition.status,
+    currentPhase: mockCompetition.currentPhase,
+    createdAt: new Date('2026-07-18T00:00:00.000Z'),
+    closedAt: null,
+  };
+}
+
+vi.mock('@/lib/repositories/CompetitionRepository', () => {
+  return {
+    CompetitionRepository: vi.fn().mockImplementation(() => ({
+      findBySlug: vi.fn().mockImplementation(async (slug: string) =>
+        slug === SLUG ? buildCompetition() : null,
+      ),
+      findById: vi.fn().mockImplementation(async (id: string) =>
+        id === COMPETITION_ID ? buildCompetition() : null,
+      ),
     })),
   };
 });
@@ -21,14 +39,16 @@ vi.mock('@/lib/repositories/LogoRepository', () => {
     LogoRepository: vi.fn().mockImplementation(() => ({
       create: vi.fn().mockResolvedValue({
         id: 'logo-1',
+        competitionId: COMPETITION_ID,
         imageUrl: 'https://example.com/logos/abc.jpg',
         uploaderName: '山田太郎',
         memo: 'テストメモ',
         createdAt: new Date('2026-07-18T00:00:00.000Z'),
       }),
-      findAll: vi.fn().mockResolvedValue([
+      findAllByCompetitionId: vi.fn().mockResolvedValue([
         {
           id: 'logo-1',
+          competitionId: COMPETITION_ID,
           imageUrl: 'https://example.com/logos/abc.jpg',
           uploaderName: '山田太郎',
           memo: 'テストメモ',
@@ -46,8 +66,8 @@ vi.mock('@/lib/repositories/LogoRepository', () => {
   };
 });
 
-const { POST: postUploadUrl } = await import('@/app/api/logos/upload-url/route');
-const { GET: getLogos, POST: postLogo } = await import('@/app/api/logos/route');
+const { POST: postUploadUrl } = await import('@/app/api/c/[slug]/logos/upload-url/route');
+const { GET: getLogos, POST: postLogo } = await import('@/app/api/c/[slug]/logos/route');
 
 function jsonRequest(url: string, body: unknown) {
   return new NextRequest(url, {
@@ -57,14 +77,22 @@ function jsonRequest(url: string, body: unknown) {
   });
 }
 
-describe('POST /api/logos/upload-url', () => {
+function slugParams(slug = SLUG) {
+  return { params: Promise.resolve({ slug }) };
+}
+
+describe('POST /api/c/[slug]/logos/upload-url', () => {
   beforeEach(() => {
-    mockAppSettings.currentPhase = 'submission';
+    mockCompetition.status = 'active';
+    mockCompetition.currentPhase = 'submission';
   });
 
   it('submissionフェーズの場合、署名付きURLを返す', async () => {
     const response = await postUploadUrl(
-      jsonRequest('http://localhost/api/logos/upload-url', { contentType: 'image/jpeg' }),
+      jsonRequest(`http://localhost/api/c/${SLUG}/logos/upload-url`, {
+        contentType: 'image/jpeg',
+      }),
+      slugParams(),
     );
 
     expect(response.status).toBe(200);
@@ -72,32 +100,66 @@ describe('POST /api/logos/upload-url', () => {
     expect(body.storagePath).toBe('abc.jpg');
   });
 
+  it('存在しないslugの場合、404を返す', async () => {
+    const response = await postUploadUrl(
+      jsonRequest('http://localhost/api/c/unknown/logos/upload-url', {
+        contentType: 'image/jpeg',
+      }),
+      slugParams('unknown'),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
   it('不正なcontentTypeの場合、400を返す', async () => {
     const response = await postUploadUrl(
-      jsonRequest('http://localhost/api/logos/upload-url', { contentType: 'image/heic' }),
+      jsonRequest(`http://localhost/api/c/${SLUG}/logos/upload-url`, {
+        contentType: 'image/heic',
+      }),
+      slugParams(),
     );
 
     expect(response.status).toBe(400);
   });
 
   it('submissionフェーズでない場合、403を返す', async () => {
-    mockAppSettings.currentPhase = 'voting';
+    mockCompetition.currentPhase = 'voting';
 
     const response = await postUploadUrl(
-      jsonRequest('http://localhost/api/logos/upload-url', { contentType: 'image/jpeg' }),
+      jsonRequest(`http://localhost/api/c/${SLUG}/logos/upload-url`, {
+        contentType: 'image/jpeg',
+      }),
+      slugParams(),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('コンペがclosedの場合、403を返す', async () => {
+    mockCompetition.status = 'closed';
+
+    const response = await postUploadUrl(
+      jsonRequest(`http://localhost/api/c/${SLUG}/logos/upload-url`, {
+        contentType: 'image/jpeg',
+      }),
+      slugParams(),
     );
 
     expect(response.status).toBe(403);
   });
 });
 
-describe('GET /api/logos', () => {
+describe('GET /api/c/[slug]/logos', () => {
   beforeEach(() => {
-    mockAppSettings.currentPhase = 'voting';
+    mockCompetition.status = 'active';
+    mockCompetition.currentPhase = 'voting';
   });
 
   it('votingフェーズの場合、投稿者名を含まないLogo一覧を返す', async () => {
-    const response = await getLogos();
+    const response = await getLogos(
+      new NextRequest(`http://localhost/api/c/${SLUG}/logos`),
+      slugParams(),
+    );
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -107,26 +169,40 @@ describe('GET /api/logos', () => {
   });
 
   it('votingフェーズでない場合、403を返す', async () => {
-    mockAppSettings.currentPhase = 'submission';
+    mockCompetition.currentPhase = 'submission';
 
-    const response = await getLogos();
+    const response = await getLogos(
+      new NextRequest(`http://localhost/api/c/${SLUG}/logos`),
+      slugParams(),
+    );
 
     expect(response.status).toBe(403);
   });
+
+  it('存在しないslugの場合、404を返す', async () => {
+    const response = await getLogos(
+      new NextRequest('http://localhost/api/c/unknown/logos'),
+      slugParams('unknown'),
+    );
+
+    expect(response.status).toBe(404);
+  });
 });
 
-describe('POST /api/logos', () => {
+describe('POST /api/c/[slug]/logos', () => {
   beforeEach(() => {
-    mockAppSettings.currentPhase = 'submission';
+    mockCompetition.status = 'active';
+    mockCompetition.currentPhase = 'submission';
   });
 
   it('正常なデータでLogoレコードを作成し、投稿者名を含まないレスポンスを返す', async () => {
     const response = await postLogo(
-      jsonRequest('http://localhost/api/logos', {
+      jsonRequest(`http://localhost/api/c/${SLUG}/logos`, {
         storagePath: 'abc.jpg',
         uploaderName: '山田太郎',
         memo: 'テストメモ',
       }),
+      slugParams(),
     );
 
     expect(response.status).toBe(200);
@@ -137,25 +213,42 @@ describe('POST /api/logos', () => {
 
   it('投稿者名が51文字以上の場合、400を返す', async () => {
     const response = await postLogo(
-      jsonRequest('http://localhost/api/logos', {
+      jsonRequest(`http://localhost/api/c/${SLUG}/logos`, {
         storagePath: 'abc.jpg',
         uploaderName: 'a'.repeat(51),
         memo: 'テストメモ',
       }),
+      slugParams(),
     );
 
     expect(response.status).toBe(400);
   });
 
   it('submissionフェーズでない場合、403を返す', async () => {
-    mockAppSettings.currentPhase = 'voting';
+    mockCompetition.currentPhase = 'voting';
 
     const response = await postLogo(
-      jsonRequest('http://localhost/api/logos', {
+      jsonRequest(`http://localhost/api/c/${SLUG}/logos`, {
         storagePath: 'abc.jpg',
         uploaderName: '山田太郎',
         memo: 'テストメモ',
       }),
+      slugParams(),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('コンペがclosedの場合、403を返す', async () => {
+    mockCompetition.status = 'closed';
+
+    const response = await postLogo(
+      jsonRequest(`http://localhost/api/c/${SLUG}/logos`, {
+        storagePath: 'abc.jpg',
+        uploaderName: '山田太郎',
+        memo: 'テストメモ',
+      }),
+      slugParams(),
     );
 
     expect(response.status).toBe(403);

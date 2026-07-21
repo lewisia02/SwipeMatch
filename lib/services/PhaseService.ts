@@ -1,32 +1,35 @@
-import { PhaseMismatchError, ValidationError } from '@/lib/errors';
-import type { AppSettingsRepository } from '@/lib/repositories/AppSettingsRepository';
-import type { EventPhase } from '@/lib/types/AppSettings';
+import { NotFoundError, PhaseMismatchError, ValidationError } from '@/lib/errors';
+import type { CompetitionRepository } from '@/lib/repositories/CompetitionRepository';
+import type { EventPhase } from '@/lib/types/Competition';
 
 const PHASE_ORDER: EventPhase[] = ['submission', 'voting', 'results'];
 
 export class PhaseService {
-  constructor(private appSettingsRepository: AppSettingsRepository) {}
+  constructor(private competitionRepository: CompetitionRepository) {}
 
-  async getCurrentPhase(): Promise<EventPhase> {
-    const settings = await this.appSettingsRepository.get();
-    return settings.currentPhase;
+  async getCurrentPhase(competitionId: string): Promise<EventPhase> {
+    const competition = await this.competitionRepository.findById(competitionId);
+    if (!competition) {
+      throw new NotFoundError('指定されたコンペが見つかりません');
+    }
+    return competition.currentPhase;
   }
 
-  async assertPhase(expected: EventPhase): Promise<void> {
-    const actual = await this.getCurrentPhase();
+  async assertPhase(competitionId: string, expected: EventPhase): Promise<void> {
+    const actual = await this.getCurrentPhase(competitionId);
     if (actual !== expected) {
       throw new PhaseMismatchError(expected, actual);
     }
   }
 
-  async transitionTo(next: EventPhase): Promise<void> {
-    const current = await this.getCurrentPhase();
+  async transitionTo(competitionId: string, next: EventPhase): Promise<void> {
+    const current = await this.getCurrentPhase(competitionId);
     if (PHASE_ORDER.indexOf(next) <= PHASE_ORDER.indexOf(current)) {
       throw new ValidationError(
         `フェーズを${current}から${next}へ逆行させることはできません`,
         'phase',
       );
     }
-    await this.appSettingsRepository.updatePhase(next);
+    await this.competitionRepository.updatePhase(competitionId, next);
   }
 }
