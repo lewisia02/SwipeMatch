@@ -40,8 +40,8 @@ export function DeleteCompetitionDialog({
       aria-labelledby="delete-competition-dialog-title"
       className="fixed inset-0 flex items-center justify-center bg-black/50 p-4"
     >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-md bg-white p-6">
-        <h2 id="delete-competition-dialog-title" className="text-h2">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-md bg-paper p-6">
+        <h2 id="delete-competition-dialog-title" className="font-display text-h2">
           コンペの削除
         </h2>
         <p className="text-body text-text-muted">

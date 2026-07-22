@@ -33,7 +33,7 @@ export function CompetitionCard({
   return (
     <div className="flex flex-col gap-3 rounded-md bg-bg-muted p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-h2">{title}</span>
+        <span className="font-display text-h2">{title}</span>
         {isActive ? <Badge variant="warning">開催中</Badge> : <Badge>{formatDate(createdAt)}</Badge>}
       </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import type { RankedLogo } from '@/lib/types/RankedLogo';
 
@@ -21,6 +21,7 @@ interface VoteTimelapseChartProps {
 }
 
 export function VoteTimelapseChart({ logos, timeline, isPlaying, onComplete }: VoteTimelapseChartProps) {
+  const shouldReduceMotion = useReducedMotion();
   const [step, setStep] = useState(0);
 
   // 投票数に応じて1票あたりの間隔を自動調整し、総再生時間が極端に長短化しないようにする
@@ -80,8 +81,13 @@ export function VoteTimelapseChart({ logos, timeline, isPlaying, onComplete }: V
         const count = counts[logo.id] ?? 0;
         const widthPercent = Math.min(100, (count / finalMaxCount) * 100);
         return (
-          <motion.li key={logo.id} layout transition={{ duration: 0.4 }} className="flex items-center gap-3">
-            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-white">
+          <motion.li
+            key={logo.id}
+            layout
+            transition={{ duration: shouldReduceMotion ? 0 : 0.4 }}
+            className="flex items-center gap-3"
+          >
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-paper">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logo.imageUrl}
@@ -95,10 +101,13 @@ export function VoteTimelapseChart({ logos, timeline, isPlaying, onComplete }: V
                 className="h-full rounded-full bg-primary"
                 initial={false}
                 animate={{ width: `${widthPercent}%` }}
-                transition={{ duration: (stepDelayMs / 1000) * 0.9, ease: 'easeOut' }}
+                transition={{
+                  duration: shouldReduceMotion ? 0 : (stepDelayMs / 1000) * 0.9,
+                  ease: 'easeOut',
+                }}
               />
             </div>
-            <span className="w-12 shrink-0 text-right text-caption font-semibold">{count}票</span>
+            <span className="w-12 shrink-0 text-right font-mono text-caption font-semibold">{count}票</span>
           </motion.li>
         );
       })}

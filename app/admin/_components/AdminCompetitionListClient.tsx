@@ -158,10 +158,10 @@ export function AdminCompetitionListClient() {
         inert={confirming || deletingCompetition ? true : undefined}
         className="mx-auto flex max-w-3xl flex-col gap-8 p-6"
       >
-        <h1 className="text-h1">管理者コンペ一覧</h1>
+        <h1 className="font-display text-h1">管理者コンペ一覧</h1>
 
         <form onSubmit={handleActivateClick} className="flex flex-col gap-3">
-          <h2 className="text-h2">新しいコンペを開催する</h2>
+          <h2 className="font-display text-h2">新しいコンペを開催する</h2>
           <Input
             id="title"
             label="題名"

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCompetition } from '@/app/c/[slug]/CompetitionContext';
+import { ColorBar } from '@/components/ColorBar';
 import { usePhasePolling } from '@/lib/client/usePhasePolling';
 
 export default function CompetitionTopPage() {
@@ -15,7 +16,8 @@ export default function CompetitionTopPage() {
   if (phaseCheckStatus === 'loading') {
     return (
       <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-        <h1 className="text-h1">🏆 {title}</h1>
+        <h1 className="font-display text-h1">{title}</h1>
+        <ColorBar className="h-1 w-16 rounded-full" />
         <p className="text-body text-text-muted">
           ロゴ作成大会に参加したみなさんのロゴを投稿・投票して優勝作品を決めましょう。
         </p>
@@ -27,7 +29,8 @@ export default function CompetitionTopPage() {
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-      <h1 className="text-h1">🏆 {title}</h1>
+      <h1 className="font-display text-h1">{title}</h1>
+      <ColorBar className="h-1 w-16 rounded-full" />
       <p className="text-body text-text-muted">
         ロゴ作成大会に参加したみなさんのロゴを投稿・投票して優勝作品を決めましょう。
       </p>
@@ -46,7 +49,7 @@ export default function CompetitionTopPage() {
           📤 画像を投稿する
         </Link>
       ) : (
-        <span className="rounded-md bg-primary/50 px-4 py-3 text-center font-semibold text-white">
+        <span className="rounded-md bg-bg-muted px-4 py-3 text-center font-semibold text-text-muted">
           📤 画像を投稿する（受付終了）
         </span>
       )}
@@ -59,7 +62,7 @@ export default function CompetitionTopPage() {
           🗳 投票へ進む
         </Link>
       ) : (
-        <span className="rounded-md bg-secondary/50 px-4 py-3 text-center font-semibold text-white">
+        <span className="rounded-md bg-bg-muted px-4 py-3 text-center font-semibold text-text-muted">
           🗳 投票へ進む（準備中）
         </span>
       )}

@@ -5,13 +5,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: '#FF6B6B',
-        secondary: '#4ECDC4',
-        skip: '#A0AEC0',
-        danger: '#E53E3E',
-        'text-base': '#1A202C',
-        'text-muted': '#718096',
-        'bg-muted': '#F7F8FA',
+        ink: '#17181C',
+        paper: '#FAFAF6',
+        primary: '#E8175D',
+        secondary: '#0BB4D4',
+        'proof-yellow': '#FFC933',
+        skip: '#8B93A1',
+        danger: '#D8315B',
+        'text-base': '#17181C',
+        'text-muted': '#6B7280',
+        'bg-muted': '#EFEEE8',
+      },
+      fontFamily: {
+        display: ['var(--font-display)'],
+        sans: ['var(--font-body)'],
+        mono: ['var(--font-mono)'],
       },
       fontSize: {
         h1: ['28px', { lineHeight: '1.3', fontWeight: '700' }],

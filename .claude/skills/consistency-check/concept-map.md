@@ -2,7 +2,7 @@
 
 `consistency-check` スキルが横断チェックの起点として使う、プロジェクト内の横断的な概念の一覧。**チェックのたびに更新し続ける生きたドキュメント**であり、新しい概念が複数ドキュメントにまたがることが分かったら随時追記する。
 
-**更新日**: 2026-07-22（投票タイムラプスと投稿一覧改善の横断レビューにより更新）
+**更新日**: 2026-07-22（PRESS PROOFデザイン刷新の横断レビューにより更新）
 
 ## 使い方
 
@@ -41,3 +41,4 @@
 | resultsフェーズガード(`results`以上を許可) | functional-design.md, glossary.md | 2026-07-22新設(`assertPhaseAtLeast`)。`getRankedResults`/`exportResultsCsv`/`getVoteTimeline`は「`currentPhase===results`」ではなく「`results`または`ended`(=`results`以上)」を許可するよう修正。glossary.md L405「`ended`到達後も管理者は結果・ダッシュボードを閲覧できる」という記述は本修正前から存在していたため変更なし(仕様の記述はそのまま、実装側のバグを修正した形)。`ui-design.md`のS-07エラー状態の文言も「`results`ではない」→「`results`未満」に修正済み |
 | 結果発表画面のタイムラプス演出(VoteTimelapseChart) | ui-design.md, functional-design.md, repository-structure.md | 2026-07-22新設。「発表開始」タップ後、投票タイムライン(`GET /api/admin/competitions/[id]/results/timeline`)が1件以上あれば`VoteTimelapseChart`で投票を時系列に1票ずつ再生してから、既存の`AnimatedRankingList`(順位スライドイン)へ自動遷移する。投票0件のコンペはタイムラプスをスキップし直接`AnimatedRankingList`へ。再生時間は投票数に応じて自動調整(目標総尺12秒、1票あたり60〜1200msでクランプ)。ドメイン用語ではなくS-07固有のUI演出のため、glossary.mdへの追記は対象外と判断(2026-07-22判断) |
 | S-06投稿状況セクションのスクロール化 | ui-design.md | 2026-07-22新設。投稿数が多くても画面全体が伸びないよう、投稿状況の一覧を最大高さ固定のスクロール領域として表示する(見出し「投稿状況(N件)」自体はスクロール対象外)。ロジック変更なし・表示のみの変更のため他ドキュメントへの波及なし |
+| ビジュアルデザインコンセプト「PRESS PROOF」(配色/フォント/装飾コンポーネント) | ui-design.md, README.md | 2026-07-22新設。コーラル`#FF6B6B`×ティール`#4ECDC4`+システムフォントから全面刷新。配色(Ink/Paper/Proof Magenta/Proof Cyan/Proof Yellow/Slate)・フォント3種(見出し`Shippori Antique B1`/本文`Inter`/データ`IBM Plex Mono`)・装飾コンポーネント(`CropMarks`/`ColorBar`/検版スタンプ風ランクバッジ)を新設。ビジュアルのみの変更のため、意図的にproduct-requirements.md/functional-design.md/architecture.md/repository-structure.md/glossary.mdは対象外とした(requirements.mdのスコープ外セクション参照)。日本語グリフを持たないフォント(`Big Shoulders`等)は本アプリの見出しがほぼ全て日本語のため実質無効になる点に注意(ui-design.mdに注意書きを記載済み) |

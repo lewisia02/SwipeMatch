@@ -31,7 +31,7 @@ export function NameGate({ children }: { children: React.ReactNode }) {
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-      <h1 className="text-h1">お名前を入力してください</h1>
+      <h1 className="font-display text-h1">お名前を入力してください</h1>
       <p className="text-body text-text-muted">
         投稿の際に表示される名前です。何でも構いません。
       </p>

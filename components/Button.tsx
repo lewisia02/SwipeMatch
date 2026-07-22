@@ -17,7 +17,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   return (
     <button
       ref={ref}
-      className={`rounded-md px-4 py-3 font-semibold disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${className}`}
+      className={`rounded-md px-4 py-3 font-semibold outline-none transition-transform disabled:opacity-50 focus-visible:ring-[3px] focus-visible:ring-ink focus-visible:ring-offset-[3px] focus-visible:ring-offset-paper active:scale-[0.98] ${VARIANT_CLASSES[variant]} ${className}`}
       disabled={disabled || loading}
       {...rest}
     >

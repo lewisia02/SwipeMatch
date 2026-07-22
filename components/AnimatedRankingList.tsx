@@ -1,6 +1,13 @@
 'use client';
 
-import { animate, AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion';
+import {
+  animate,
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/Badge';
 import type { RankedLogo } from '@/lib/types/RankedLogo';
@@ -21,23 +28,25 @@ interface AnimatedRankingListProps {
 }
 
 function AnimatedVoteCount({ value }: { value: number }) {
+  const shouldReduceMotion = useReducedMotion();
   const count = useMotionValue(0);
   const rounded = useTransform(count, (v) => Math.round(v));
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
-    const controls = animate(count, value, { duration: COUNT_UP_DURATION_SEC });
+    const controls = animate(count, value, { duration: shouldReduceMotion ? 0 : COUNT_UP_DURATION_SEC });
     const unsubscribe = rounded.on('change', setDisplay);
     return () => {
       controls.stop();
       unsubscribe();
     };
-  }, [count, rounded, value]);
+  }, [count, rounded, value, shouldReduceMotion]);
 
-  return <span className="text-h2 shrink-0">{display}票</span>;
+  return <span className="shrink-0 font-mono text-h2">{display}票</span>;
 }
 
 export function AnimatedRankingList({ items, isPlaying, onComplete }: AnimatedRankingListProps) {
+  const shouldReduceMotion = useReducedMotion();
   // 発表順（下位→上位）と最終表示順（上位→下位）を別々に保持する
   const sortedByRank = useMemo(() => [...items].sort((a, b) => a.rank - b.rank), [items]);
   const revealOrder = useMemo(() => [...sortedByRank].reverse(), [sortedByRank]);
@@ -74,15 +83,22 @@ export function AnimatedRankingList({ items, isPlaying, onComplete }: AnimatedRa
           <motion.li
             key={item.id}
             layout
-            initial={{ opacity: 0, y: 40 }}
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center gap-4 rounded-md bg-bg-muted p-4"
+            transition={{ duration: shouldReduceMotion ? 0 : 0.5 }}
+            className="flex items-center gap-4 rounded-md bg-bg-muted p-4 text-text-base"
           >
-            <span className="text-h1 w-12 shrink-0 text-center">
+            <motion.span
+              initial={shouldReduceMotion ? false : { scale: 1.6, rotate: -20, opacity: 0 }}
+              animate={{ scale: 1, rotate: -6, opacity: 1 }}
+              transition={
+                shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 15 }
+              }
+              className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-double border-ink font-display text-h1 text-ink"
+            >
               {MEDALS[item.rank] ?? item.rank}
-            </span>
-            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-white">
+            </motion.span>
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-sm bg-paper">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.imageUrl}
@@ -92,7 +108,7 @@ export function AnimatedRankingList({ items, isPlaying, onComplete }: AnimatedRa
             </div>
             <div className="flex flex-1 flex-col gap-1">
               <div className="flex items-center gap-2">
-                <span className="text-h2">{item.uploaderName}</span>
+                <span className="font-display text-h2">{item.uploaderName}</span>
                 {item.isTiedForRunoff && <Badge variant="warning">同着（ランオフ対象）</Badge>}
               </div>
               <p className="text-body text-text-muted">&ldquo;{item.memo}&rdquo;</p>

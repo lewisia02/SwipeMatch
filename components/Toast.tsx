@@ -6,7 +6,7 @@ interface ToastProps {
 const VARIANT_CLASSES: Record<NonNullable<ToastProps['variant']>, string> = {
   success: 'bg-secondary text-white',
   error: 'bg-danger text-white',
-  info: 'bg-gray-800 text-white',
+  info: 'bg-ink text-white',
 };
 
 export function Toast({ message, variant = 'info' }: ToastProps) {

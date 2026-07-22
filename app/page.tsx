@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ColorBar } from '@/components/ColorBar';
 import { createCompetitionService } from '@/lib/services/container';
 
 // 開催中コンペは随時変わるため、ビルド時の静的プリレンダリングを避け常に実行時に評価する
@@ -10,7 +11,11 @@ export default async function GlobalTopPage() {
 
   return (
     <main className="mx-auto flex max-w-md flex-col items-center gap-4 p-6 text-center">
-      <h1 className="text-h1">🏆 社内AIイベント ロゴ投票アプリ</h1>
+      <p className="font-mono text-caption uppercase tracking-widest text-text-muted">
+        社内AIイベント
+      </p>
+      <h1 className="font-display text-h1 leading-none">ロゴ作成大会</h1>
+      <ColorBar className="h-1.5 w-24 rounded-full" />
 
       {active ? (
         <Link
