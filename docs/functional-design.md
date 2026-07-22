@@ -36,7 +36,7 @@ Next.js（App Router）1つのアプリケーションが、参加者向け画�
 ### エンティティ: Competition（コンペ）
 
 ```typescript
-type EventPhase = 'submission' | 'voting' | 'results';
+type EventPhase = 'submission' | 'voting' | 'results' | 'ended';
 type CompetitionStatus = 'active' | 'closed';
 
 interface Competition {
@@ -54,7 +54,7 @@ interface Competition {
 - `status = 'active'` のレコードは常に0件または1件（DBの部分ユニークインデックスで保証。詳細は`docs/architecture.md`）
 - 新しいコンペを開催すると、既存の`active`コンペは`closed`に更新される（`closedAt`をセット）。既存の`logos`/`votes`はそのまま保持され、削除されない
 - `slug`はコンペ作成時にサーバー側でランダム生成する（英数字8桁程度）。生成した値が既存slugと衝突した場合は再生成してリトライする
-- `currentPhase`は旧`AppSettings.currentPhase`に相当し、これまでアプリ全体で1つだったフェーズが、コンペごとに独立して持つ形に変わる。フェーズの意味・遷移ルール（`submission`→`voting`→`results`、逆行不可）自体は変更しない
+- `currentPhase`は旧`AppSettings.currentPhase`に相当し、これまでアプリ全体で1つだったフェーズが、コンペごとに独立して持つ形に変わる。フェーズの遷移ルールは`submission`→`voting`→`results`→`ended`の前方一方向のみで、逆行不可。`ended`は運営がコンペの区切りとして明示的に切り替える最終フェーズであり、`status`（`active`/`closed`）とは独立した概念（`active`のまま`ended`になることも、`closed`後も`ended`の記録は保持されることもある）
 
 ### エンティティ: Logo
 
@@ -71,7 +71,7 @@ interface Logo {
 
 **制約**:
 - `competitionId` / `imageUrl` / `uploaderName` / `memo` はすべて必須
-- `uploaderName`: 1-50文字、`memo`: 1-200文字
+- `uploaderName`: 1-50文字、`memo`: 1-200文字。`uploaderName`はコンペ入場時に一度だけ入力する参加者名（クライアント側`localStorage`に保存、詳細はSwipeSessionManager節を参照）がそのまま使われ、画像投稿フォーム自体には投稿者名の入力欄を設けない
 - 画像ファイルサイズ上限10MB、アップロード時の入力形式は jpg/png/heic/webp を受け付ける。HEICはブラウザでのネイティブ表示に対応しないことが多いため、クライアント側で`heic2any`等を用いてJPEGに変換してからアップロードし、Storageに保存される`imageUrl`の実体は常にjpg/png/webpのいずれかになる
 - 1人が複数件投稿可能（`uploaderName` に一意制約は設けない）
 - 一覧取得は常に`competitionId`でフィルタし、他コンペのLogoが混在しないようにする
@@ -158,35 +158,42 @@ erDiagram
 - 新規開催時、既存の`active`コンペがあれば`closed`に更新する（自動クローズ）
 - slugからのコンペ解決（参加者向けURL・APIのルーティングで使用）
 - 開催中コンペの取得、コンペ一覧（過去分含む）の取得
+- `closed`なコンペの完全削除（画像Storage・logos・votes・vote_locks・competitions行をすべて削除。`active`なコンペは削除不可）
 
 **インターフェース**:
 ```typescript
 class CompetitionService {
   activate(title: string): Promise<Competition>; // 既存activeを自動クローズしてから新規作成
   findBySlug(slug: string): Promise<Competition>; // 存在しない場合はNotFoundError
+  findById(id: string): Promise<Competition>; // 存在しない場合はNotFoundError
   findActive(): Promise<Competition | null>;
   listAll(): Promise<Competition[]>; // 管理者のコンペ一覧表示用（開催日時降順）
+  remove(id: string): Promise<void>; // activeなら ValidationError。Storage画像削除→logos削除（votesはON DELETE CASCADEで連動削除）→vote_locks削除→competitions削除の順で実行
 }
 ```
 
 **依存関係**:
-- CompetitionRepository
+- CompetitionRepository / LogoRepository / VoteRepository（`remove`が画像・関連レコードの削除にこれらを利用するため）
 
 ### PhaseService（フェーズ管理・共通）
 
 **責務**:
 - 指定コンペの現在の`EventPhase`の取得
 - 指定フェーズとの一致確認（不一致の場合は`PhaseMismatchError`をthrow）
-- フェーズ遷移時、現在フェーズより後方（`submission`→`voting`→`results`の順）であることの検証（逆行遷移は`ValidationError`をthrow）
+- 指定フェーズ以上（`PHASE_ORDER`上で同じか後方）であることの確認（不一致の場合は`PhaseMismatchError`をthrow）
+- フェーズ遷移時、現在フェーズより後方（`submission`→`voting`→`results`→`ended`の順）であることの検証（逆行遷移は`ValidationError`をthrow）
 
 **インターフェース**:
 ```typescript
 class PhaseService {
   getCurrentPhase(competitionId: string): Promise<EventPhase>;
   assertPhase(competitionId: string, expected: EventPhase): Promise<void>;
+  assertPhaseAtLeast(competitionId: string, minPhase: EventPhase): Promise<void>; // 現在フェーズ >= minPhase でなければPhaseMismatchError
   transitionTo(competitionId: string, next: EventPhase): Promise<void>; // 逆行遷移はValidationError
 }
 ```
+
+**設計メモ（`assertPhaseAtLeast`）**: `getRankedResults`・`exportResultsCsv`・`getVoteTimeline`は「`results`フェーズちょうど」ではなく「`results`に到達済み（`results`または`ended`）」であれば許可する。これは、コンペを`ended`に遷移した後も結果発表画面の閲覧・CSVエクスポートを継続できるようにするための修正（`assertPhase(competitionId, 'results')`のままだと`ended`到達後に403になっていた回帰バグの修正）。
 
 **依存関係**:
 - CompetitionRepository
@@ -207,14 +214,16 @@ class CompetitionRepository {
   findActive(): Promise<Competition | null>;
   findAll(): Promise<Competition[]>; // createdAt降順
   updatePhase(id: string, phase: EventPhase): Promise<Competition>;
+  delete(id: string): Promise<void>; // コンペ削除用。呼び出し前に紐づくlogos/votes/vote_locksが削除済みであること
 }
 
 class LogoRepository {
   create(data: Omit<Logo, 'id' | 'createdAt'>): Promise<Logo>; // competitionIdを含む
   findAllByCompetitionId(competitionId: string): Promise<Logo[]>;
   delete(id: string): Promise<void>; // Post-MVPの投稿削除機能用（現状未使用）
+  deleteAllByCompetitionId(competitionId: string): Promise<void>; // コンペ削除用。votes.logo_idのON DELETE CASCADEにより紐づくvotesも連動削除される
   createSignedUploadUrl(): Promise<{ uploadUrl: string; storagePath: string }>; // Supabase Storageの署名付きURL発行
-  deleteStorageObject(storagePath: string): Promise<void>; // DB書き込み失敗時、アップロード済み画像を削除する補償処理用
+  deleteStorageObject(storagePath: string): Promise<void>; // DB書き込み失敗時、アップロード済み画像を削除する補償処理用。コンペ削除時の画像一括削除にも利用
 }
 
 class VoteRepository {
@@ -223,6 +232,10 @@ class VoteRepository {
   createMany(votes: Omit<Vote, 'id' | 'createdAt'>[]): Promise<Vote[]>; // 各要素にcompetitionIdを含む
   countByAnonId(competitionId: string, anonId: string): Promise<number>;
   countByLogoId(competitionId: string): Promise<Record<string, number>>; // ランキング集計用
+  countVoters(competitionId: string): Promise<number>; // vote_locksの件数（投票済み人数）。管理者ダッシュボード用
+  countTotal(competitionId: string): Promise<number>; // votesの件数（総投票数）。管理者ダッシュボード用
+  findAllByCompetitionId(competitionId: string): Promise<Vote[]>; // created_at昇順。結果発表画面のタイムラプス演出用
+  deleteLocksByCompetitionId(competitionId: string): Promise<void>; // コンペ削除用。vote_locks.competitionIdにはCASCADEが無いため明示的に削除する
 }
 ```
 
@@ -280,6 +293,36 @@ interface SwipeSession {
 **依存関係**:
 - ブラウザ `localStorage`（`competitionId`を含むキーで1ブラウザ・1コンペにつき1セッションを保持。匿名IDには依存しない）
 
+### 参加者名（NameGate・クライアント側）
+
+**責務**:
+- `/c/[slug]`配下への初回アクセス時、参加者名（何でもよい・匿名可、1-50文字）の入力を求める
+- 入力済みの名前をブラウザの`localStorage`に保存し、以後の画像投稿で投稿者名として自動的に使用する（画像投稿フォーム自体には投稿者名の入力欄を設けない）
+
+**インターフェース**:
+```typescript
+function getParticipantName(): string | null;
+function setParticipantName(name: string): void;
+```
+
+**依存関係**:
+- ブラウザ `localStorage`（キー`swipematch_participant_name`。`anon_id` Cookieはサーバー発行のhttpOnlyでクライアントJSから読めないため、名前は別のキーで管理する。コンペ横断で共通の名前を使い回してよい設計とする）
+
+### フェーズポーリング（`usePhasePolling`・クライアント側）
+
+**責務**:
+- 参加者向け画面が現在のフェーズを一定間隔（デフォルト5秒）でポーリングし、運営によるフェーズ切替をリロード無しで画面に反映する
+
+**インターフェース**:
+```typescript
+function usePhasePolling(slug: string, intervalMs?: number): {
+  phase: EventPhase | null;
+  status: 'loading' | 'loaded' | 'unknown';
+};
+```
+
+トップ画面（S-01、投稿／投票導線の活性・非活性の切り替え）と、決選投票完了後の結果待ち表示（S-04、フェーズに応じたメッセージ更新）の双方から共通で利用する。
+
 ### VoteService（決選投票）
 
 `submitVotes`は`VoteRepository.reserveVoteSlot`による原子的な予約を投票確定の前段に挟むことで、同一anonIdからの同時リクエストによる多重投票を防ぐ（詳細は「匿名IDベースの多重投票防止」を参照）。予約後に`Vote`作成が失敗した場合は`releaseVoteSlot`で予約を取り消し、再投票を可能にする。
@@ -307,9 +350,11 @@ class VoteService {
 
 **責務**:
 - 管理者パスワードの検証とセッション（JWT Cookie）発行
-- 指定コンペのフェーズ切り替え（`submission` → `voting` → `results`、逆行遷移は`PhaseService.transitionTo`で拒否）
+- 指定コンペのフェーズ切り替え（`submission` → `voting` → `results` → `ended`、逆行遷移は`PhaseService.transitionTo`で拒否）
 - 指定コンペの得票数ランキングの集計、同数得票のランオフ対象抽出
 - 指定コンペの結果ランキングのCSVエクスポート
+- 指定コンペの投稿数・投稿詳細・投票状況（投票済み人数／総投票数）の集計（管理者ダッシュボード用。`getRankedResults`と異なり`results`フェーズ以外でも取得可能）
+- 指定コンペの投票タイムライン（投票日時昇順）の取得（結果発表画面のタイムラプス演出用）
 
 **インターフェース**:
 ```typescript
@@ -317,14 +362,28 @@ class AdminService {
   login(password: string): Promise<{ token: string }>;
   verifySession(token: string): Promise<void>; // 全admin Route Handlersが先頭で呼び出す共通の認証ヘルパー。未認証・期限切れの場合はUnauthorizedErrorをthrow
   setPhase(competitionId: string, phase: EventPhase): Promise<void>; // PhaseService.transitionToを呼び出す
-  getRankedResults(competitionId: string): Promise<RankedLogo[]>;
-  exportResultsCsv(competitionId: string): Promise<string>; // CSV文字列を返す
+  getRankedResults(competitionId: string): Promise<RankedLogo[]>; // assertPhaseAtLeast(competitionId, 'results')
+  exportResultsCsv(competitionId: string): Promise<string>; // CSV文字列を返す。内部でgetRankedResultsを呼ぶため同じフェーズガード
+  getDashboardStats(competitionId: string): Promise<DashboardStats>; // 管理者ダッシュボード（コンペ管理画面）用の集計
+  getVoteTimeline(competitionId: string): Promise<VoteTimelineEntry[]>; // assertPhaseAtLeast(competitionId, 'results')
 }
 
 interface RankedLogo extends Logo {
   voteCount: number;
   rank: number;
   isTiedForRunoff: boolean; // 同順位で境界にかかる場合にランオフ対象としてフラグを立てる
+}
+
+interface DashboardStats {
+  submissionCount: number;
+  submissions: Array<{ id: string; imageUrl: string; uploaderName: string; memo: string; createdAt: Date }>;
+  voterCount: number;   // vote_locksの件数
+  totalVotes: number;   // votesの件数
+}
+
+interface VoteTimelineEntry {
+  logoId: string;
+  votedAt: Date; // voterAnonIdは匿名性維持のため含めない
 }
 ```
 
@@ -525,19 +584,21 @@ stateDiagram-v2
     [*] --> submission: コンペ開催時の初期フェーズ
     submission --> voting: 運営が投稿締切を操作
     voting --> results: 運営が投票締切を操作
-    results --> [*]: コンペのクローズ（または開催中のまま結果発表を継続）
+    results --> ended: 運営がコンペ終了を操作
+    ended --> [*]
 ```
 
 各フェーズにおける画面アクセス制御（開催中コンペ単位で判定。他のコンペのフェーズには影響しない）:
 - `submission`: 投稿画面のみ操作可能。投票画面は「準備中」表示
 - `voting`: 投稿は不可（締切済み表示）。スワイプ1次選考・決選投票が可能
 - `results`: 参加者側の投票操作は不可。管理者パスワードを持つ運営のみ結果画面を閲覧可能
+- `ended`: 参加者向け画面（`/c/[slug]`配下）は`closed`と同様に「このコンペは終了しました」を表示し、投稿・投票を含むすべての操作を受け付けない。管理者は引き続き結果・ダッシュボードを閲覧できる
 
-コンペが`closed`になった後も、そのコンペの`currentPhase`とデータはそのまま保持され、管理者は過去のコンペとして結果を閲覧できる。
+コンペが`closed`になった後も、そのコンペの`currentPhase`とデータはそのまま保持され、管理者は過去のコンペとして結果を閲覧できる。`ended`は`status`（`active`/`closed`）とは独立したフェーズであり、`active`のまま`ended`に切り替えることもできる（次のコンペが開催されるまでは`active`かつ`ended`の状態が続く）。
 
 ## API設計
 
-参加者向けAPIはすべて`/api/c/[slug]/...`の形式でコンペのslugをパスに含める。各ハンドラは冒頭で`CompetitionService.findBySlug(slug)`を呼び、存在しなければ404、`status`が`closed`なら操作系（投稿・投票）は403を返す（結果閲覧系は管理者APIのみで、参加者向けには結果APIを設けない。PRDのスコープ外「参加者が自分の端末で結果発表画面を直接閲覧する機能」を参照）。
+参加者向けAPIはすべて`/api/c/[slug]/...`の形式でコンペのslugをパスに含める。各ハンドラは冒頭で`CompetitionService.findBySlug(slug)`を呼び、存在しなければ404、`status`が`closed`なら操作系（投稿・投票）は403を返す（結果閲覧系は管理者APIのみで、参加者向けには結果APIを設けない。PRDのスコープ外「参加者が自分の端末で結果発表画面を直接閲覧する機能」を参照）。`currentPhase`が`ended`の場合の参加者アクセス遮断は、個々のAPIハンドラでは重複実装せず、`closed`と同様に`app/c/[slug]/layout.tsx`の共通の前段チェックとして一箇所に集約する。
 
 ### 画像アップロード用の署名付きURL発行
 
@@ -778,7 +839,7 @@ GET /api/admin/competitions/[id]/results
 **エラーレスポンス**:
 - 401 Unauthorized: 管理者未認証、またはセッション（JWT）の期限切れ
 - 404 Not Found: `id`に該当するコンペが存在しない
-- 403 Forbidden: 対象コンペの`currentPhase`が `results` ではない
+- 403 Forbidden: 対象コンペの`currentPhase`が `results` 未満（`submission`/`voting`）（`results`・`ended`はいずれも許可。`assertPhaseAtLeast`を参照）
 
 ### 結果ランキングのCSVエクスポート（管理者）
 
@@ -791,7 +852,72 @@ GET /api/admin/competitions/[id]/results/export
 **エラーレスポンス**:
 - 401 Unauthorized: 管理者未認証、またはセッション（JWT）の期限切れ
 - 404 Not Found: `id`に該当するコンペが存在しない
-- 403 Forbidden: 対象コンペの`currentPhase`が `results` ではない
+- 403 Forbidden: 対象コンペの`currentPhase`が `results` 未満（`submission`/`voting`）（`results`・`ended`はいずれも許可）
+
+### 投票タイムライン取得（管理者・結果発表画面のタイムラプス演出用）
+
+```
+GET /api/admin/competitions/[id]/results/timeline
+```
+
+**レスポンス**:
+```json
+{ "timeline": [{ "logoId": "uuid", "votedAt": "2026-07-22T01:40:00.000Z" }] }
+```
+
+投票日時の昇順。`voterAnonId`は匿名性維持のため含めない。
+
+**エラーレスポンス**:
+- 401 Unauthorized: 管理者未認証、またはセッション（JWT）の期限切れ
+- 404 Not Found: `id`に該当するコンペが存在しない
+- 403 Forbidden: 対象コンペの`currentPhase`が `results` 未満（`submission`/`voting`）（`results`・`ended`はいずれも許可）
+
+### コンペダッシュボード集計取得（管理者）
+
+```
+GET /api/admin/competitions/[id]/stats
+```
+
+**レスポンス**:
+```json
+{
+  "submissionCount": 12,
+  "submissions": [
+    { "id": "uuid", "imageUrl": "https://...", "uploaderName": "山田太郎", "memo": "一口メモ", "createdAt": "2026-07-20T09:00:00.000Z" }
+  ],
+  "voterCount": 8,
+  "totalVotes": 20
+}
+```
+
+`results`フェーズ以外でも取得可能（運営がコンペ進行中に随時確認できるようにするため。得票数ランキングそのものは`GET /api/admin/competitions/[id]/results`と異なり含まない）。
+
+**エラーレスポンス**:
+- 401 Unauthorized: 管理者未認証、またはセッション（JWT）の期限切れ
+- 404 Not Found: `id`に該当するコンペが存在しない
+
+### コンペの削除（管理者）
+
+```
+DELETE /api/admin/competitions/[id]
+```
+
+**リクエスト**:
+```json
+{ "title": "第1回ロゴ作成大会" }
+```
+
+誤操作防止のため、削除対象コンペの`title`と完全一致することをサーバー側でも検証する（クライアント側のUIバリデーションのみに依存しない）。一致した場合、対象コンペに紐づく画像（Supabase Storage）・`logos`・`votes`・`vote_locks`・`competitions`行をすべて削除する（`CompetitionService.remove`を参照）。
+
+**レスポンス**:
+```json
+{ "success": true }
+```
+
+**エラーレスポンス**:
+- 401 Unauthorized: 管理者未認証、またはセッション（JWT）の期限切れ
+- 404 Not Found: `id`に該当するコンペが存在しない
+- 400 Bad Request: リクエストボディの`title`が対象コンペの題名と一致しない、または対象コンペの`status`が`active`（開催中のコンペは削除不可）
 
 ## アルゴリズム設計
 

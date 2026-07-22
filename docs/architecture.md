@@ -96,8 +96,9 @@
   2. 既存の`app_settings`（シングルトン行）の内容を基に、最初の`Competition`レコードを`status='active'`で挿入する（`slug`はサーバー側のロジックと同じ生成関数で発行、`title`は仮の初期値とする）
   3. 既存の`logos`/`votes`/`vote_locks`全件に、2で作成した`competition_id`を一括UPDATEで設定する（導入時点のデータは全件が単一コンペに属するため、条件分岐は不要）
   4. `competition_id`をNOT NULL化し、`vote_locks`の主キーを`(competition_id, voter_anon_id)`の複合キーに変更する
-- **ロールバック余地**: `app_settings`テーブル自体はこのマイグレーションでは削除せず、動作確認後の別マイグレーション（`0002_drop_app_settings.sql`）で削除する。新規Supabaseプロジェクトへのフルインストール用の`scripts/schema.sql`は、`competitions`を含む最終形（`app_settings`を含まない）に更新する
+- **ロールバック余地**: `app_settings`テーブル自体はこのマイグレーションでは削除せず、動作確認後の別マイグレーションで削除する（`0002`は後述の`ended`フェーズ追加に使用したため、`app_settings`削除は未実施のままなら`0003`以降の番号で行う）。新規Supabaseプロジェクトへのフルインストール用の`scripts/schema.sql`は、`competitions`を含む最終形（`app_settings`を含まない）に更新する
 - **将来の再実行**: 2件目以降のコンペは通常のアプリケーションロジック（`CompetitionService.activate`）で作成されるため、上記マイグレーションは初回導入時の一度きりの手順である
+- **`scripts/migrations/0002_add_ended_phase.sql`**: コンペ運用機能拡張（`ended`フェーズ追加）にあたり、`competitions.current_phase`のCHECK制約に`'ended'`を追加するマイグレーション。既存Supabaseプロジェクトでは`0001`適用後にこれも実行する必要がある（実行しない場合、`results`→`ended`のフェーズ切替はDBのCHECK制約違反で失敗する）。`scripts/schema.sql`（新規プロジェクト向け）は最初から`'ended'`を含む定義になっている
 
 ### バックアップ戦略
 

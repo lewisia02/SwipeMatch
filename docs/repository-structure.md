@@ -8,7 +8,7 @@ Next.js (App Router) の規約に従い、`app/` がUIレイヤーとAPIレイ�
 project-root/
 ├── middleware.ts           # 匿名ID(anon_id)のhttpOnly Cookie発行(Edge Middleware。コンペ非依存でグローバル単一)
 ├── app/                    # UIレイヤー(ページ) + APIレイヤー(Route Handlers)
-│   ├── page.tsx            # グローバルトップ: 開催中コンペへredirect、無ければ案内表示
+│   ├── page.tsx            # グローバルトップ: 開催中コンペへの導線ボタン・案内表示・管理者はこちらリンク(自動redirectはしない)
 │   ├── c/
 │   │   └── [slug]/          # コンペ専用URL配下(参加者向け画面)
 │   │       ├── layout.tsx    # slug→Competition解決(Server Component、404/closedガード)
@@ -38,9 +38,12 @@ project-root/
 │           └── competitions/
 │               ├── route.ts         # コンペ一覧取得・新規開催
 │               └── [id]/
+│                   ├── route.ts     # コンペの完全削除(DELETE)
 │                   ├── phase/
+│                   ├── stats/       # 投稿数・投稿詳細・投票状況の集計取得
 │                   └── results/
-│                       └── export/  # 結果ランキングのCSVエクスポート
+│                       ├── export/    # 結果ランキングのCSVエクスポート
+│                       └── timeline/  # 投票タイムライン取得(結果発表画面のタイムラプス演出用)
 ├── components/             # 共通UIコンポーネント
 ├── lib/                    # サービスレイヤー・データレイヤー・共通ロジック
 │   ├── errors.ts            # カスタムエラークラス(ValidationError等。全レイヤーから参照可)
@@ -70,8 +73,8 @@ project-root/
 **役割**: `docs/ui-design.md` の画面一覧(S-01〜S-04)に対応するページを、コンペ専用URL `app/c/[slug]/` 配下に配置する。`app/page.tsx`はコンペに紐付かないグローバルなリダイレクト専用ページ
 
 **配置ファイル**:
-- `app/page.tsx`: グローバルトップ。`GET /api/competitions/active`を呼び、開催中コンペがあれば`/c/{slug}`へ`redirect()`、無ければ案内メッセージを表示するServer Component
-- `app/c/[slug]/layout.tsx`: `CompetitionService.findBySlug(slug)`でコンペを解決するServer Component。存在しなければ`notFound()`、`status`が`closed`なら案内メッセージを表示し、配下のページをレンダリングしない
+- `app/page.tsx`: グローバルトップ。`CompetitionService.findActive()`を呼び、開催中コンペがあれば「投票に参加する」ボタン（`/c/{slug}`）、無ければ案内メッセージを表示するServer Component。自動`redirect()`は行わない。常に「管理者はこちら」（`/admin`）リンクを表示する
+- `app/c/[slug]/layout.tsx`: `CompetitionService.findBySlug(slug)`でコンペを解決するServer Component。存在しなければ`notFound()`、`status`が`closed`または`currentPhase`が`ended`なら案内メッセージを表示し、配下のページをレンダリングしない。それ以外の場合、`components/NameGate.tsx`で配下のページ全体をラップし、参加者名が未入力ならS-01を含む配下画面のレンダリングをブロックする
 - `app/c/[slug]/page.tsx`: S-01 トップ画面
 - `app/c/[slug]/upload/page.tsx`: S-02 画像投稿画面
 - `app/c/[slug]/vote/swipe/page.tsx`: S-03 スワイプ1次選考画面
@@ -117,9 +120,12 @@ project-root/
 - `app/api/c/[slug]/phase/route.ts`: `GET /api/c/[slug]/phase`
 - `app/api/admin/login/route.ts`: `POST /api/admin/login`
 - `app/api/admin/competitions/route.ts`: `GET /api/admin/competitions` / `POST /api/admin/competitions`
+- `app/api/admin/competitions/[id]/route.ts`: `DELETE /api/admin/competitions/[id]`
 - `app/api/admin/competitions/[id]/phase/route.ts`: `POST /api/admin/competitions/[id]/phase`
+- `app/api/admin/competitions/[id]/stats/route.ts`: `GET /api/admin/competitions/[id]/stats`
 - `app/api/admin/competitions/[id]/results/route.ts`: `GET /api/admin/competitions/[id]/results`
 - `app/api/admin/competitions/[id]/results/export/route.ts`: `GET /api/admin/competitions/[id]/results/export`
+- `app/api/admin/competitions/[id]/results/timeline/route.ts`: `GET /api/admin/competitions/[id]/results/timeline`
 
 **命名規則**:
 - Next.js App Routerの規約に従い、ファイル名は`route.ts`固定
@@ -147,7 +153,7 @@ project-root/
 **役割**: `docs/ui-design.md` の共通コンポーネント一覧に対応するReactコンポーネントを配置する
 
 **配置ファイル**:
-- `Button.tsx`, `Input.tsx`, `Textarea.tsx`, `Toast.tsx`, `ProgressBar.tsx`, `Badge.tsx`, `ConfirmDialog.tsx`, `SwipeCard.tsx`, `SelectableGrid.tsx`, `QRCodeDisplay.tsx`（画面固有, S-06/S-08）, `RankingList.tsx`（画面固有, S-07。発表開始前の静的表示用）, `AnimatedRankingList.tsx`（画面固有, S-07。`framer-motion`によるスライドイン・カウントアップ演出用）, `CompetitionCard.tsx`（画面固有, S-08）
+- `Button.tsx`, `Input.tsx`, `Textarea.tsx`, `Toast.tsx`, `ProgressBar.tsx`, `Badge.tsx`, `ConfirmDialog.tsx`, `NameGate.tsx`（`/c/[slug]`配下共通の参加者名入力ゲート）, `SwipeCard.tsx`, `SelectableGrid.tsx`, `QRCodeDisplay.tsx`（画面固有, S-06/S-08）, `RankingList.tsx`（画面固有, S-07。発表開始前の静的表示用）, `VoteTimelapseChart.tsx`（画面固有, S-07。`framer-motion`による投票タイムラプス演出用）, `AnimatedRankingList.tsx`（画面固有, S-07。`framer-motion`によるスライドイン・カウントアップ演出用）, `CompetitionCard.tsx`（画面固有, S-08）, `DeleteCompetitionDialog.tsx`（画面固有, S-08。コンペ削除の確認）
 
 **命名規則**:
 - PascalCase（例: `SwipeCard.tsx`）
@@ -212,7 +218,7 @@ lib/services/
 **役割**: `zod`によるAPIリクエストのスキーマ定義
 
 **配置ファイル**:
-- `uploadSchema.ts`, `voteSchema.ts`, `adminSchema.ts`
+- `uploadSchema.ts`, `voteSchema.ts`, `adminSchema.ts`, `competitionSchema.ts`（コンペ開催・削除時のバリデーション）
 
 **命名規則**: camelCase + `Schema`接尾辞
 
@@ -240,17 +246,21 @@ lib/services/
 
 **配置ファイル**:
 - `SwipeSessionManager.ts`: 1次選考のキープ状態管理
+- `participantName.ts`: 参加者名の取得・保存（`localStorage`）
+- `usePhasePolling.ts`: 参加者向け画面が現在のフェーズを一定間隔で再取得するためのReact Hook
 
-**命名規則**: PascalCase + `Manager`接尾辞
+**命名規則**: クラスはPascalCase + `Manager`接尾辞（`SwipeSessionManager`）。関数・HookはcamelCase（Hookは`use`始まり）
 
 **依存関係**:
 - 依存可能: `lib/types/`, `lib/algorithms/`(シャッフル処理の利用)
-- 依存禁止: `lib/repositories/`, `app/api/`
+- 依存禁止: `lib/repositories/`（Repositoryクラスの直接importは禁止。`usePhasePolling.ts`のように`fetch()`で`app/api/`のURLを呼び出すこと自体は、`app/`(ページ)からのAPIレイヤー呼び出しをHookとして切り出したものであり許容する。TypeScriptモジュールとしての`app/api/**/route.ts`のimportは禁止のまま）
 
 **例**:
 ```
 lib/client/
-└── SwipeSessionManager.ts
+├── SwipeSessionManager.ts
+├── participantName.ts
+└── usePhasePolling.ts
 ```
 
 ### lib/types/ (型定義)

@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCompetition } from '@/app/c/[slug]/CompetitionContext';
 import { Button } from '@/components/Button';
-import { Input } from '@/components/Input';
 import { Textarea } from '@/components/Textarea';
 import { Toast } from '@/components/Toast';
 import { convertHeicToJpegIfNeeded } from '@/lib/client/convertHeicToJpeg';
+import { getParticipantName } from '@/lib/client/participantName';
 import type { EventPhase } from '@/lib/types/Competition';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -48,12 +48,10 @@ export default function UploadPage() {
   const [phaseCheckStatus, setPhaseCheckStatus] = useState<PhaseCheckStatus>('loading');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [uploaderName, setUploaderName] = useState('');
   const [memo, setMemo] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [progress, setProgress] = useState(0);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [uploaderNameError, setUploaderNameError] = useState<string | null>(null);
   const [memoError, setMemoError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -111,12 +109,6 @@ export default function UploadPage() {
       setImageError('画像を選択してください');
       hasError = true;
     }
-    if (!uploaderName) {
-      setUploaderNameError('投稿者名を入力してください');
-      hasError = true;
-    } else {
-      setUploaderNameError(null);
-    }
     if (!memo) {
       setMemoError('一口メモを入力してください');
       hasError = true;
@@ -147,7 +139,7 @@ export default function UploadPage() {
       const createRes = await fetch(`/api/c/${slug}/logos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storagePath, uploaderName, memo }),
+        body: JSON.stringify({ storagePath, uploaderName: getParticipantName(), memo }),
       });
       if (!createRes.ok) {
         const body = await createRes.json();
@@ -196,17 +188,6 @@ export default function UploadPage() {
             <img src={previewUrl} alt="投稿されたロゴ画像のプレビュー" className="max-h-64 rounded-md" />
           )}
         </div>
-
-        <Input
-          id="uploaderName"
-          label="投稿者名"
-          value={uploaderName}
-          maxLength={50}
-          error={uploaderNameError ?? undefined}
-          onChange={(e) => setUploaderName(e.target.value)}
-          disabled={isBusy || isFormDisabled}
-          required
-        />
 
         <Textarea
           id="memo"

@@ -116,6 +116,15 @@ export class CompetitionRepository {
     return (data as CompetitionRow[]).map(toCompetition);
   }
 
+  async delete(id: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from('competitions').delete().eq('id', id);
+
+    if (error) {
+      throw new Error(`Competitionの削除に失敗しました: ${error.message}`);
+    }
+  }
+
   async updatePhase(id: string, phase: EventPhase): Promise<Competition> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase

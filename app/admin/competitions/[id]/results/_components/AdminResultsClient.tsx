@@ -5,9 +5,15 @@ import { useEffect, useState } from 'react';
 import { AnimatedRankingList } from '@/components/AnimatedRankingList';
 import { Button } from '@/components/Button';
 import { RankingList } from '@/components/RankingList';
+import { VoteTimelapseChart } from '@/components/VoteTimelapseChart';
 import type { RankedLogo } from '@/lib/types/RankedLogo';
 
-type LoadStatus = 'loading' | 'empty' | 'error' | 'ready' | 'playing' | 'revealed';
+type LoadStatus = 'loading' | 'empty' | 'error' | 'ready' | 'timelapse' | 'playing' | 'revealed';
+
+interface VoteTimelineEntry {
+  logoId: string;
+  votedAt: string;
+}
 
 interface AdminResultsClientProps {
   id: string;
@@ -18,6 +24,7 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
   const router = useRouter();
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
   const [results, setResults] = useState<RankedLogo[]>([]);
+  const [timeline, setTimeline] = useState<VoteTimelineEntry[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -30,9 +37,12 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
     async function loadResults() {
       setLoadStatus('loading');
       try {
-        const res = await fetch(`/api/admin/competitions/${id}/results`);
+        const [resultsRes, timelineRes] = await Promise.all([
+          fetch(`/api/admin/competitions/${id}/results`),
+          fetch(`/api/admin/competitions/${id}/results/timeline`),
+        ]);
 
-        if (res.status === 401) {
+        if (resultsRes.status === 401 || timelineRes.status === 401) {
           if (!cancelled) {
             router.push(
               `/admin/login?message=${encodeURIComponent('セッションの有効期限が切れました。再度ログインしてください')}`,
@@ -41,8 +51,8 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
           return;
         }
 
-        if (!res.ok) {
-          const body: { message?: string } = await res.json().catch(() => ({}));
+        if (!resultsRes.ok) {
+          const body: { message?: string } = await resultsRes.json().catch(() => ({}));
           if (!cancelled) {
             setErrorMessage(body.message ?? '結果発表はまだ準備中です');
             setLoadStatus('error');
@@ -50,10 +60,14 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
           return;
         }
 
-        const body: { results: RankedLogo[] } = await res.json();
+        const body: { results: RankedLogo[] } = await resultsRes.json();
+        const timelineBody: { timeline: VoteTimelineEntry[] } = timelineRes.ok
+          ? await timelineRes.json()
+          : { timeline: [] };
         if (cancelled) return;
 
         setResults(body.results);
+        setTimeline(timelineBody.timeline);
         setLoadStatus(body.results.length === 0 ? 'empty' : 'ready');
       } catch {
         if (!cancelled) {
@@ -69,7 +83,10 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-h1">{title} 結果発表</h1>
         {loadStatus === 'ready' && (
-          <Button type="button" onClick={() => setLoadStatus('playing')}>
+          <Button
+            type="button"
+            onClick={() => setLoadStatus(timeline.length === 0 ? 'playing' : 'timelapse')}
+          >
             発表開始
           </Button>
         )}
@@ -88,6 +105,15 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
       {loadStatus === 'error' && <p className="text-body text-danger">{errorMessage}</p>}
 
       {loadStatus === 'ready' && <RankingList items={results} />}
+
+      {loadStatus === 'timelapse' && (
+        <VoteTimelapseChart
+          logos={results}
+          timeline={timeline}
+          isPlaying={loadStatus === 'timelapse'}
+          onComplete={() => setLoadStatus('playing')}
+        />
+      )}
 
       {(loadStatus === 'playing' || loadStatus === 'revealed') && (
         <AnimatedRankingList

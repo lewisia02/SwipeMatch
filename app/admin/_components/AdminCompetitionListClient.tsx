@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/Button';
 import { CompetitionCard } from '@/components/CompetitionCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { DeleteCompetitionDialog } from '@/components/DeleteCompetitionDialog';
 import { Input } from '@/components/Input';
 import { Toast } from '@/components/Toast';
 import type { Competition } from '@/lib/types/Competition';
@@ -42,6 +43,8 @@ export function AdminCompetitionListClient() {
   const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [appOrigin, setAppOrigin] = useState('');
+  const [deletingCompetition, setDeletingCompetition] = useState<Competition | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setAppOrigin(window.location.origin);
@@ -120,10 +123,39 @@ export function AdminCompetitionListClient() {
     }
   }
 
+  async function handleDeleteConfirm() {
+    if (!deletingCompetition) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/competitions/${deletingCompetition.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: deletingCompetition.title }),
+      });
+
+      if (!res.ok) {
+        const body: { message?: string } = await res.json().catch(() => ({}));
+        setToast({
+          message: body.message ?? 'エラーが発生しました。時間をおいて再度お試しください',
+          variant: 'error',
+        });
+        return;
+      }
+
+      setDeletingCompetition(null);
+      setToast({ message: 'コンペを削除しました', variant: 'success' });
+      await loadCompetitions();
+    } catch {
+      setToast({ message: 'エラーが発生しました。時間をおいて再度お試しください', variant: 'error' });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <>
       <main
-        inert={confirming ? true : undefined}
+        inert={confirming || deletingCompetition ? true : undefined}
         className="mx-auto flex max-w-3xl flex-col gap-8 p-6"
       >
         <h1 className="text-h1">管理者コンペ一覧</h1>
@@ -165,7 +197,12 @@ export function AdminCompetitionListClient() {
           <div className="flex flex-col gap-3">
             <h2 className="text-h2">過去のコンペ</h2>
             {pastCompetitions.map((competition) => (
-              <CompetitionCard key={competition.id} {...competition} appOrigin={appOrigin} />
+              <CompetitionCard
+                key={competition.id}
+                {...competition}
+                appOrigin={appOrigin}
+                onDeleteClick={() => setDeletingCompetition(competition)}
+              />
             ))}
           </div>
         )}
@@ -179,6 +216,15 @@ export function AdminCompetitionListClient() {
           message={`現在開催中の「${activeCompetition.title}」は終了し、過去のコンペとして保存されます。よろしいですか？`}
           onConfirm={() => void activate()}
           onCancel={() => setConfirming(false)}
+        />
+      )}
+
+      {deletingCompetition && (
+        <DeleteCompetitionDialog
+          competitionTitle={deletingCompetition.title}
+          deleting={deleting}
+          onConfirm={() => void handleDeleteConfirm()}
+          onCancel={() => setDeletingCompetition(null)}
         />
       )}
     </>

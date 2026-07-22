@@ -7,6 +7,24 @@ import type { EventPhase } from '@/lib/types/Competition';
 import type { RankedLogo } from '@/lib/types/RankedLogo';
 import type { PhaseService } from '@/lib/services/PhaseService';
 
+export interface VoteTimelineEntry {
+  logoId: string;
+  votedAt: Date;
+}
+
+export interface DashboardStats {
+  submissionCount: number;
+  submissions: Array<{
+    id: string;
+    imageUrl: string;
+    uploaderName: string;
+    memo: string;
+    createdAt: Date;
+  }>;
+  voterCount: number;
+  totalVotes: number;
+}
+
 const JWT_EXPIRATION = '4h';
 
 function getSessionSecret(): Uint8Array {
@@ -70,7 +88,7 @@ export class AdminService {
   }
 
   async getRankedResults(competitionId: string): Promise<RankedLogo[]> {
-    await this.phaseService.assertPhase(competitionId, 'results');
+    await this.phaseService.assertPhaseAtLeast(competitionId, 'results');
 
     const [logos, voteCounts] = await Promise.all([
       this.logoRepository.findAllByCompetitionId(competitionId),
@@ -83,6 +101,34 @@ export class AdminService {
     }));
 
     return rankWithTieDetection(logosWithVoteCount);
+  }
+
+  async getDashboardStats(competitionId: string): Promise<DashboardStats> {
+    const [logos, voterCount, totalVotes] = await Promise.all([
+      this.logoRepository.findAllByCompetitionId(competitionId),
+      this.voteRepository.countVoters(competitionId),
+      this.voteRepository.countTotal(competitionId),
+    ]);
+
+    return {
+      submissionCount: logos.length,
+      submissions: logos.map((logo) => ({
+        id: logo.id,
+        imageUrl: logo.imageUrl,
+        uploaderName: logo.uploaderName,
+        memo: logo.memo,
+        createdAt: logo.createdAt,
+      })),
+      voterCount,
+      totalVotes,
+    };
+  }
+
+  async getVoteTimeline(competitionId: string): Promise<VoteTimelineEntry[]> {
+    await this.phaseService.assertPhaseAtLeast(competitionId, 'results');
+
+    const votes = await this.voteRepository.findAllByCompetitionId(competitionId);
+    return votes.map((vote) => ({ logoId: vote.logoId, votedAt: vote.createdAt }));
   }
 
   async exportResultsCsv(competitionId: string): Promise<string> {

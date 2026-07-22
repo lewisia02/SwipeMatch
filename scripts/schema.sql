@@ -20,7 +20,7 @@ create table if not exists competitions (
   slug text not null unique,
   title text not null,
   status text not null check (status in ('active', 'closed')),
-  current_phase text not null check (current_phase in ('submission', 'voting', 'results')),
+  current_phase text not null check (current_phase in ('submission', 'voting', 'results', 'ended')),
   created_at timestamptz not null default now(),
   closed_at timestamptz
 );

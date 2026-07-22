@@ -9,7 +9,9 @@ import { VoteService } from '@/lib/services/VoteService';
 
 export function createCompetitionService(): CompetitionService {
   const competitionRepository = new CompetitionRepository();
-  return new CompetitionService(competitionRepository);
+  const logoRepository = new LogoRepository();
+  const voteRepository = new VoteRepository();
+  return new CompetitionService(competitionRepository, logoRepository, voteRepository);
 }
 
 export function createUploadService(): UploadService {

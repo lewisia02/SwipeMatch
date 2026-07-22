@@ -31,7 +31,7 @@ class LogoRepository { }
 
 // 型エイリアス・インターフェース: PascalCase
 interface Logo { }
-type EventPhase = 'submission' | 'voting' | 'results';
+type EventPhase = 'submission' | 'voting' | 'results' | 'ended';
 ```
 
 **ファイル名**（`docs/repository-structure.md` のファイル配置規則に準拠）:

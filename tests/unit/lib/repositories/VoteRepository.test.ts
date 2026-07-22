@@ -15,6 +15,7 @@ function createQueryBuilder(result: QueryResult) {
     select: vi.fn(() => builder),
     delete: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    order: vi.fn(() => builder),
     then: (resolve: (value: QueryResult) => void) => resolve(result),
   };
   return builder;
@@ -152,6 +153,85 @@ describe('VoteRepository', () => {
       const result = await repository.countByAnonId(COMPETITION_ID, 'anon-1');
 
       expect(result).toBe(0);
+    });
+  });
+
+  describe('findAllByCompetitionId', () => {
+    it('created_at昇順でVote一覧を返す', async () => {
+      const rows = [
+        {
+          id: 'vote-1',
+          competition_id: COMPETITION_ID,
+          logo_id: 'logo-1',
+          voter_anon_id: 'anon-1',
+          created_at: '2026-07-22T00:00:00.000Z',
+        },
+        {
+          id: 'vote-2',
+          competition_id: COMPETITION_ID,
+          logo_id: 'logo-2',
+          voter_anon_id: 'anon-2',
+          created_at: '2026-07-22T00:01:00.000Z',
+        },
+      ];
+      const client = mockSupabaseClient({ data: rows, error: null });
+      vi.mocked(getSupabaseClient).mockReturnValue(client as never);
+      const repository = new VoteRepository();
+
+      const result = await repository.findAllByCompetitionId(COMPETITION_ID);
+
+      const builder = client.from.mock.results[0].value;
+      expect(builder.order).toHaveBeenCalledWith('created_at', { ascending: true });
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({ id: 'vote-1', logoId: 'logo-1' });
+    });
+
+    it('DBエラー時は例外をスローする', async () => {
+      vi.mocked(getSupabaseClient).mockReturnValue(
+        mockSupabaseClient({ error: { message: 'DB接続エラー' } }) as never,
+      );
+      const repository = new VoteRepository();
+
+      await expect(repository.findAllByCompetitionId(COMPETITION_ID)).rejects.toThrow(
+        'Vote一覧の取得に失敗しました',
+      );
+    });
+  });
+
+  describe('countVoters', () => {
+    it('vote_locksの件数を投票済み人数として返す', async () => {
+      vi.mocked(getSupabaseClient).mockReturnValue(
+        mockSupabaseClient({ count: 5, error: null }) as never,
+      );
+      const repository = new VoteRepository();
+
+      const result = await repository.countVoters(COMPETITION_ID);
+
+      expect(result).toBe(5);
+    });
+
+    it('該当レコードがない場合は0を返す', async () => {
+      vi.mocked(getSupabaseClient).mockReturnValue(
+        mockSupabaseClient({ count: null, error: null }) as never,
+      );
+      const repository = new VoteRepository();
+
+      const result = await repository.countVoters(COMPETITION_ID);
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('countTotal', () => {
+    it('votesの件数を総投票数として返す', async () => {
+      vi.mocked(getSupabaseClient).mockReturnValue(
+        mockSupabaseClient({ count: 12, error: null }) as never,
+      );
+      const repository = new VoteRepository();
+
+      const result = await repository.countTotal(COMPETITION_ID);
+
+      expect(result).toBe(12);
     });
   });
 

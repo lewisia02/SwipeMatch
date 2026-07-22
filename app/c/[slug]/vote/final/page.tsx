@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCompetition } from '@/app/c/[slug]/CompetitionContext';
+import { WaitingForResults } from '@/app/c/[slug]/vote/final/_components/WaitingForResults';
 import { Button } from '@/components/Button';
 import { Counter } from '@/components/Counter';
 import { SelectableGrid } from '@/components/SelectableGrid';
@@ -22,7 +22,6 @@ interface ToastState {
 }
 
 export default function FinalVotePage() {
-  const router = useRouter();
   const { slug } = useCompetition();
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
   const [keptLogos, setKeptLogos] = useState<Logo[]>([]);
@@ -72,12 +71,6 @@ export default function FinalVotePage() {
     const timer = setTimeout(() => setToast(null), duration);
     return () => clearTimeout(timer);
   }, [toast]);
-
-  useEffect(() => {
-    if (submitStatus !== 'success') return;
-    const timer = setTimeout(() => router.push(`/c/${slug}`), 1500);
-    return () => clearTimeout(timer);
-  }, [submitStatus, router, slug]);
 
   function handleToggle(id: string) {
     setSelected((prev) =>
@@ -156,7 +149,9 @@ export default function FinalVotePage() {
         </div>
       )}
 
-      {loadStatus === 'ready' && (
+      {loadStatus === 'ready' && submitStatus === 'success' && <WaitingForResults slug={slug} />}
+
+      {loadStatus === 'ready' && submitStatus !== 'success' && (
         <>
           <SelectableGrid
             items={keptLogos}

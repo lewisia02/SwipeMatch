@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Badge } from '@/components/Badge';
+import { Button } from '@/components/Button';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import type { CompetitionStatus, EventPhase } from '@/lib/types/Competition';
 
@@ -11,13 +12,22 @@ interface CompetitionCardProps {
   currentPhase: EventPhase;
   createdAt: Date;
   appOrigin: string;
+  onDeleteClick?: () => void;
 }
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-export function CompetitionCard({ id, slug, title, status, createdAt, appOrigin }: CompetitionCardProps) {
+export function CompetitionCard({
+  id,
+  slug,
+  title,
+  status,
+  createdAt,
+  appOrigin,
+  onDeleteClick,
+}: CompetitionCardProps) {
   const isActive = status === 'active';
 
   return (
@@ -35,6 +45,12 @@ export function CompetitionCard({ id, slug, title, status, createdAt, appOrigin 
       >
         {isActive ? '管理画面を開く' : '結果を見る'}
       </Link>
+
+      {!isActive && onDeleteClick && (
+        <Button type="button" variant="secondary" onClick={onDeleteClick}>
+          削除
+        </Button>
+      )}
     </div>
   );
 }

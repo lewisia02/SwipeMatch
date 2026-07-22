@@ -1,4 +1,4 @@
-export type EventPhase = 'submission' | 'voting' | 'results';
+export type EventPhase = 'submission' | 'voting' | 'results' | 'ended';
 export type CompetitionStatus = 'active' | 'closed';
 
 export interface Competition {

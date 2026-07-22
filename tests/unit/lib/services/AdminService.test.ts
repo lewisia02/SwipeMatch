@@ -17,22 +17,41 @@ function createMockLogoRepository(logos: Logo[] = []) {
   } as unknown as LogoRepository;
 }
 
-function createMockVoteRepository(voteCounts: Record<string, number> = {}) {
+function createMockVoteRepository(
+  voteCounts: Record<string, number> = {},
+  stats: { voterCount?: number; totalVotes?: number } = {},
+  votes: Array<{ id: string; logoId: string; voterAnonId: string; createdAt: Date }> = [],
+) {
   return {
     countByLogoId: vi.fn().mockResolvedValue(voteCounts),
+    countVoters: vi.fn().mockResolvedValue(stats.voterCount ?? 0),
+    countTotal: vi.fn().mockResolvedValue(stats.totalVotes ?? 0),
+    findAllByCompetitionId: vi.fn().mockResolvedValue(
+      votes.map((v) => ({ ...v, competitionId: COMPETITION_ID })),
+    ),
   } as unknown as VoteRepository;
 }
 
-function createMockPhaseService(currentPhase: 'submission' | 'voting' | 'results' = 'results') {
+const PHASE_ORDER = ['submission', 'voting', 'results', 'ended'];
+
+function createMockPhaseService(
+  currentPhase: 'submission' | 'voting' | 'results' | 'ended' = 'results',
+) {
   return {
     assertPhase: vi.fn().mockImplementation(async (_competitionId: string, expected: string) => {
       if (expected !== currentPhase) {
         throw new PhaseMismatchError(expected as never, currentPhase);
       }
     }),
+    assertPhaseAtLeast: vi
+      .fn()
+      .mockImplementation(async (_competitionId: string, minPhase: string) => {
+        if (PHASE_ORDER.indexOf(currentPhase) < PHASE_ORDER.indexOf(minPhase)) {
+          throw new PhaseMismatchError(minPhase as never, currentPhase);
+        }
+      }),
     transitionTo: vi.fn().mockImplementation(async (_competitionId: string, next: string) => {
-      const order = ['submission', 'voting', 'results'];
-      if (order.indexOf(next) <= order.indexOf(currentPhase)) {
+      if (PHASE_ORDER.indexOf(next) <= PHASE_ORDER.indexOf(currentPhase)) {
         throw new ValidationError('逆行遷移はできません', 'phase');
       }
     }),
@@ -178,6 +197,19 @@ describe('AdminService', () => {
       await expect(service.getRankedResults(COMPETITION_ID)).rejects.toThrow(PhaseMismatchError);
     });
 
+    it('endedフェーズ(resultsより後方)の場合でも、ランキングを返す（回帰確認）', async () => {
+      const logos = [buildLogo({ id: 'logo-1' })];
+      const service = new AdminService(
+        createMockLogoRepository(logos),
+        createMockVoteRepository({ 'logo-1': 3 }),
+        createMockPhaseService('ended'),
+      );
+
+      const results = await service.getRankedResults(COMPETITION_ID);
+
+      expect(results[0]).toMatchObject({ id: 'logo-1', voteCount: 3, rank: 1 });
+    });
+
     it('resultsフェーズの場合、得票数降順のランキングを返す', async () => {
       const logos = [buildLogo({ id: 'logo-1' }), buildLogo({ id: 'logo-2' })];
       const logoRepository = createMockLogoRepository(logos);
@@ -192,6 +224,89 @@ describe('AdminService', () => {
       expect(logoRepository.findAllByCompetitionId).toHaveBeenCalledWith(COMPETITION_ID);
       expect(results[0]).toMatchObject({ id: 'logo-2', voteCount: 5, rank: 1 });
       expect(results[1]).toMatchObject({ id: 'logo-1', voteCount: 3, rank: 2 });
+    });
+  });
+
+  describe('getDashboardStats', () => {
+    it('投稿数・投稿詳細・投票状況を集計して返す', async () => {
+      const logos = [
+        buildLogo({ id: 'logo-1', uploaderName: '山田太郎', memo: 'メモ1' }),
+        buildLogo({ id: 'logo-2', uploaderName: '鈴木花子', memo: 'メモ2' }),
+      ];
+      const logoRepository = createMockLogoRepository(logos);
+      const voteRepository = createMockVoteRepository({}, { voterCount: 4, totalVotes: 9 });
+      const service = new AdminService(logoRepository, voteRepository, createMockPhaseService());
+
+      const stats = await service.getDashboardStats(COMPETITION_ID);
+
+      expect(logoRepository.findAllByCompetitionId).toHaveBeenCalledWith(COMPETITION_ID);
+      expect(voteRepository.countVoters).toHaveBeenCalledWith(COMPETITION_ID);
+      expect(voteRepository.countTotal).toHaveBeenCalledWith(COMPETITION_ID);
+      expect(stats.submissionCount).toBe(2);
+      expect(stats.submissions).toHaveLength(2);
+      expect(stats.submissions[0]).toMatchObject({ id: 'logo-1', uploaderName: '山田太郎' });
+      expect(stats.voterCount).toBe(4);
+      expect(stats.totalVotes).toBe(9);
+    });
+
+    it('投稿・投票が0件の場合、0の集計結果を返す', async () => {
+      const service = new AdminService(
+        createMockLogoRepository([]),
+        createMockVoteRepository(),
+        createMockPhaseService(),
+      );
+
+      const stats = await service.getDashboardStats(COMPETITION_ID);
+
+      expect(stats).toEqual({
+        submissionCount: 0,
+        submissions: [],
+        voterCount: 0,
+        totalVotes: 0,
+      });
+    });
+  });
+
+  describe('getVoteTimeline', () => {
+    it('resultsフェーズ未満の場合、PhaseMismatchErrorをスローする', async () => {
+      const service = new AdminService(
+        createMockLogoRepository(),
+        createMockVoteRepository(),
+        createMockPhaseService('voting'),
+      );
+
+      await expect(service.getVoteTimeline(COMPETITION_ID)).rejects.toThrow(PhaseMismatchError);
+    });
+
+    it('投票を時系列順に{logoId, votedAt}へ整形して返し、voterAnonIdは含めない', async () => {
+      const votedAt1 = new Date('2026-07-22T00:00:00.000Z');
+      const votedAt2 = new Date('2026-07-22T00:01:00.000Z');
+      const voteRepository = createMockVoteRepository({}, {}, [
+        { id: 'vote-1', logoId: 'logo-1', voterAnonId: 'anon-1', createdAt: votedAt1 },
+        { id: 'vote-2', logoId: 'logo-2', voterAnonId: 'anon-2', createdAt: votedAt2 },
+      ]);
+      const service = new AdminService(
+        createMockLogoRepository(),
+        voteRepository,
+        createMockPhaseService('results'),
+      );
+
+      const timeline = await service.getVoteTimeline(COMPETITION_ID);
+
+      expect(timeline).toEqual([
+        { logoId: 'logo-1', votedAt: votedAt1 },
+        { logoId: 'logo-2', votedAt: votedAt2 },
+      ]);
+    });
+
+    it('endedフェーズでも取得できる（回帰確認）', async () => {
+      const service = new AdminService(
+        createMockLogoRepository(),
+        createMockVoteRepository(),
+        createMockPhaseService('ended'),
+      );
+
+      await expect(service.getVoteTimeline(COMPETITION_ID)).resolves.toEqual([]);
     });
   });
 

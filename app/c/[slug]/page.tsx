@@ -1,47 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { useCompetition } from '@/app/c/[slug]/CompetitionContext';
-import type { EventPhase } from '@/lib/types/Competition';
-
-type PhaseCheckStatus = 'loading' | 'loaded' | 'unknown';
+import { usePhasePolling } from '@/lib/client/usePhasePolling';
 
 export default function CompetitionTopPage() {
   const { slug, title } = useCompetition();
-  const [phaseCheckStatus, setPhaseCheckStatus] = useState<PhaseCheckStatus>('loading');
-  const [phase, setPhase] = useState<EventPhase | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch(`/api/c/${slug}/phase`)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error('フェーズの取得に失敗しました');
-        }
-        return res.json();
-      })
-      .then((body: { phase: EventPhase }) => {
-        if (!cancelled) {
-          setPhase(body.phase);
-          setPhaseCheckStatus('loaded');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPhaseCheckStatus('unknown');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
+  const { phase, status: phaseCheckStatus } = usePhasePolling(slug);
 
   // loading中・取得失敗時は両ボタンを活性のままにする（遷移先で個別にフェーズチェックされるため）
   const isSubmissionOpen = phaseCheckStatus !== 'loaded' || phase === 'submission';
-  const isVotingOpen = phaseCheckStatus !== 'loaded' || phase !== 'submission';
+  const isVotingOpen = phaseCheckStatus !== 'loaded' || phase === 'voting' || phase === 'results';
 
   if (phaseCheckStatus === 'loading') {
     return (

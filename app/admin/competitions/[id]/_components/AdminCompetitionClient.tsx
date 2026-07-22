@@ -10,29 +10,47 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { Toast } from '@/components/Toast';
 import type { EventPhase } from '@/lib/types/Competition';
 
-const PHASE_ORDER: EventPhase[] = ['submission', 'voting', 'results'];
+const PHASE_ORDER: EventPhase[] = ['submission', 'voting', 'results', 'ended'];
 
 const PHASE_LABELS: Record<EventPhase, string> = {
   submission: '投稿受付中',
   voting: '投票中',
   results: '結果発表中',
+  ended: '終了',
 };
 
 const PHASE_BUTTON_LABELS: Record<EventPhase, string> = {
   submission: '投稿受付開始',
   voting: '投票開始',
   results: '結果発表',
+  ended: 'コンペを終了する',
 };
 
 const PHASE_CONFIRM_MESSAGES: Record<EventPhase, string> = {
   submission: '投稿受付フェーズに切り替えます。よろしいですか？',
   voting: '投票フェーズに切り替えます。投稿は締め切られます。よろしいですか？',
   results: '結果発表フェーズに切り替えます。投票は締め切られます。よろしいですか？',
+  ended: 'コンペを終了します。参加者は以後アクセスできなくなります。よろしいですか？',
 };
 
 interface ToastState {
   message: string;
   variant: 'success' | 'error' | 'info';
+}
+
+interface DashboardSubmission {
+  id: string;
+  imageUrl: string;
+  uploaderName: string;
+  memo: string;
+  createdAt: string;
+}
+
+interface DashboardStats {
+  submissionCount: number;
+  submissions: DashboardSubmission[];
+  voterCount: number;
+  totalVotes: number;
 }
 
 interface AdminCompetitionClientProps {
@@ -50,10 +68,30 @@ export function AdminCompetitionClient({ id, slug, title, initialPhase }: AdminC
   const [toast, setToast] = useState<ToastState | null>(null);
   const [appOrigin, setAppOrigin] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
     setAppOrigin(window.location.origin);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`/api/admin/competitions/${id}/stats`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: DashboardStats | null) => {
+        if (!cancelled && body) {
+          setStats(body);
+        }
+      })
+      .catch(() => {
+        // 集計取得の失敗はフェーズ操作をブロックしないため、静かに無視する
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!toast) return;
@@ -184,6 +222,46 @@ export function AdminCompetitionClient({ id, slug, title, initialPhase }: AdminC
           <h2 className="text-h2">コンペ専用URL QRコード</h2>
           {appOrigin && <QRCodeDisplay url={`${appOrigin}/c/${slug}`} />}
         </div>
+
+        {stats && (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-h2">投稿状況（{stats.submissionCount}件）</h2>
+              {stats.submissions.length === 0 ? (
+                <p className="text-body text-text-muted">まだ投稿がありません</p>
+              ) : (
+                <div className="max-h-96 overflow-y-auto rounded-md">
+                  <ul className="flex flex-col gap-2">
+                    {stats.submissions.map((submission) => (
+                      <li
+                        key={submission.id}
+                        className="flex items-center gap-3 rounded-md bg-bg-muted p-2"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={submission.imageUrl}
+                          alt={submission.memo}
+                          className="h-12 w-12 rounded-md object-cover"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-caption font-semibold">{submission.uploaderName}</span>
+                          <span className="text-caption text-text-muted">{submission.memo}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h2 className="text-h2">投票状況</h2>
+              <p className="text-body">
+                投票済み人数: {stats.voterCount}人 / 総投票数: {stats.totalVotes}票
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3">
           <Link

@@ -54,6 +54,19 @@ export class VoteRepository {
     }
   }
 
+  // コンペ削除用。vote_locks.competition_idにはCASCADEが無いため明示的に削除する
+  async deleteLocksByCompetitionId(competitionId: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase
+      .from('vote_locks')
+      .delete()
+      .eq('competition_id', competitionId);
+
+    if (error) {
+      throw new Error(`投票予約の一括削除に失敗しました: ${error.message}`);
+    }
+  }
+
   async createMany(votes: Omit<Vote, 'id' | 'createdAt'>[]): Promise<Vote[]> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
@@ -84,6 +97,50 @@ export class VoteRepository {
 
     if (error) {
       throw new Error(`投票件数の取得に失敗しました: ${error.message}`);
+    }
+
+    return count ?? 0;
+  }
+
+  // 投票タイムライン用。voterAnonIdは匿名性維持のため呼び出し元では使用しない
+  async findAllByCompetitionId(competitionId: string): Promise<Vote[]> {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('votes')
+      .select('*')
+      .eq('competition_id', competitionId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw new Error(`Vote一覧の取得に失敗しました: ${error.message}`);
+    }
+
+    return (data as VoteRow[]).map(toVote);
+  }
+
+  async countVoters(competitionId: string): Promise<number> {
+    const supabase = getSupabaseClient();
+    const { count, error } = await supabase
+      .from('vote_locks')
+      .select('*', { count: 'exact', head: true })
+      .eq('competition_id', competitionId);
+
+    if (error) {
+      throw new Error(`投票済み人数の取得に失敗しました: ${error.message}`);
+    }
+
+    return count ?? 0;
+  }
+
+  async countTotal(competitionId: string): Promise<number> {
+    const supabase = getSupabaseClient();
+    const { count, error } = await supabase
+      .from('votes')
+      .select('*', { count: 'exact', head: true })
+      .eq('competition_id', competitionId);
+
+    if (error) {
+      throw new Error(`総投票数の取得に失敗しました: ${error.message}`);
     }
 
     return count ?? 0;

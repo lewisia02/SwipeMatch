@@ -53,6 +53,31 @@ describe('PhaseService', () => {
     });
   });
 
+  describe('assertPhaseAtLeast', () => {
+    it('現在のフェーズがちょうど指定フェーズの場合、何もスローしない', async () => {
+      const repository = createMockRepository('results');
+      const service = new PhaseService(repository);
+
+      await expect(service.assertPhaseAtLeast(COMPETITION_ID, 'results')).resolves.toBeUndefined();
+    });
+
+    it('現在のフェーズが指定フェーズより後方の場合、何もスローしない', async () => {
+      const repository = createMockRepository('ended');
+      const service = new PhaseService(repository);
+
+      await expect(service.assertPhaseAtLeast(COMPETITION_ID, 'results')).resolves.toBeUndefined();
+    });
+
+    it('現在のフェーズが指定フェーズより前方の場合、PhaseMismatchErrorをスローする', async () => {
+      const repository = createMockRepository('voting');
+      const service = new PhaseService(repository);
+
+      await expect(service.assertPhaseAtLeast(COMPETITION_ID, 'results')).rejects.toThrow(
+        PhaseMismatchError,
+      );
+    });
+  });
+
   describe('transitionTo', () => {
     it('前方への遷移は許可される', async () => {
       const repository = createMockRepository('submission');
@@ -78,6 +103,24 @@ describe('PhaseService', () => {
       const service = new PhaseService(repository);
 
       await expect(service.transitionTo(COMPETITION_ID, 'voting')).rejects.toThrow(
+        ValidationError,
+      );
+    });
+
+    it('resultsからendedへの遷移は許可される', async () => {
+      const repository = createMockRepository('results');
+      const service = new PhaseService(repository);
+
+      await service.transitionTo(COMPETITION_ID, 'ended');
+
+      expect(repository.updatePhase).toHaveBeenCalledWith(COMPETITION_ID, 'ended');
+    });
+
+    it('endedからsubmissionへの逆行遷移はValidationErrorをスローする', async () => {
+      const repository = createMockRepository('ended');
+      const service = new PhaseService(repository);
+
+      await expect(service.transitionTo(COMPETITION_ID, 'submission')).rejects.toThrow(
         ValidationError,
       );
     });
