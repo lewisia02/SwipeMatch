@@ -9,7 +9,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const { slug } = await params;
     const competition = await competitionService.findBySlug(slug);
 
-    return NextResponse.json({ phase: competition.currentPhase });
+    return NextResponse.json({ phase: competition.currentPhase, runoffRound: competition.runoffRound });
   } catch (error) {
     if (error instanceof NotFoundError) {
       return NextResponse.json({ message: error.message }, { status: 404 });

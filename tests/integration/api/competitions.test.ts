@@ -11,6 +11,7 @@ const ACTIVE_COMPETITION: Competition = {
   title: '第2回ロゴ作成大会',
   status: 'active',
   currentPhase: 'submission',
+  runoffRound: null,
   createdAt: new Date('2026-07-20T00:00:00.000Z'),
   closedAt: null,
 };
@@ -42,6 +43,7 @@ vi.mock('@/lib/repositories/CompetitionRepository', () => {
           title: data.title,
           status: 'active' as const,
           currentPhase: 'submission' as const,
+          runoffRound: null,
           createdAt: new Date('2026-07-20T09:00:00.000Z'),
           closedAt: null,
         };
@@ -103,7 +105,7 @@ describe('GET /api/c/[slug]/phase', () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ phase: 'submission' });
+    expect(body).toEqual({ phase: 'submission', runoffRound: null });
   });
 
   it('存在しないslugの場合、404を返す', async () => {

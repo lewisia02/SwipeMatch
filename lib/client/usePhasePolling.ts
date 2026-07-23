@@ -8,8 +8,9 @@ export type PhasePollingStatus = 'loading' | 'loaded' | 'unknown';
 export function usePhasePolling(
   slug: string,
   intervalMs: number = DEFAULT_INTERVAL_MS,
-): { phase: EventPhase | null; status: PhasePollingStatus } {
+): { phase: EventPhase | null; runoffRound: number | null; status: PhasePollingStatus } {
   const [phase, setPhase] = useState<EventPhase | null>(null);
+  const [runoffRound, setRunoffRound] = useState<number | null>(null);
   const [status, setStatus] = useState<PhasePollingStatus>('loading');
 
   useEffect(() => {
@@ -23,9 +24,10 @@ export function usePhasePolling(
           }
           return res.json();
         })
-        .then((body: { phase: EventPhase }) => {
+        .then((body: { phase: EventPhase; runoffRound: number | null }) => {
           if (!cancelled) {
             setPhase(body.phase);
+            setRunoffRound(body.runoffRound);
             setStatus('loaded');
           }
         })
@@ -45,5 +47,5 @@ export function usePhasePolling(
     };
   }, [slug, intervalMs]);
 
-  return { phase, status };
+  return { phase, runoffRound, status };
 }

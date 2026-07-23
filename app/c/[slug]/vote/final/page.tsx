@@ -1,15 +1,17 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCompetition } from '@/app/c/[slug]/CompetitionContext';
-import { WaitingForResults } from '@/app/c/[slug]/vote/final/_components/WaitingForResults';
 import { Button } from '@/components/Button';
 import { Counter } from '@/components/Counter';
 import { SelectableGrid } from '@/components/SelectableGrid';
 import { Toast } from '@/components/Toast';
 import { SwipeSessionManager } from '@/lib/client/SwipeSessionManager';
+import { markVoted } from '@/lib/client/voteSession';
 import type { Logo } from '@/lib/types/Logo';
+import { FINAL_VOTE_ROUND } from '@/lib/types/Vote';
 
 const MAX_SELECTABLE = 3;
 
@@ -22,6 +24,7 @@ interface ToastState {
 }
 
 export default function FinalVotePage() {
+  const router = useRouter();
   const { slug } = useCompetition();
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
   const [keptLogos, setKeptLogos] = useState<Logo[]>([]);
@@ -105,7 +108,9 @@ export default function FinalVotePage() {
       }
 
       setSubmitStatus('success');
+      markVoted(slug, FINAL_VOTE_ROUND);
       setToast({ message: '投票ありがとうございました', variant: 'success' });
+      setTimeout(() => router.push(`/c/${slug}`), 2000);
     } catch {
       setSubmitStatus('error');
       setToast({ message: 'エラーが発生しました。時間をおいて再度お試しください', variant: 'error' });
@@ -149,9 +154,7 @@ export default function FinalVotePage() {
         </div>
       )}
 
-      {loadStatus === 'ready' && submitStatus === 'success' && <WaitingForResults slug={slug} />}
-
-      {loadStatus === 'ready' && submitStatus !== 'success' && (
+      {loadStatus === 'ready' && (
         <>
           <SelectableGrid
             items={keptLogos}

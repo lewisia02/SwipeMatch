@@ -40,7 +40,7 @@ describe('VoteRepository', () => {
       );
       const repository = new VoteRepository();
 
-      await expect(repository.reserveVoteSlot(COMPETITION_ID, 'anon-1')).resolves.toBe(true);
+      await expect(repository.reserveVoteSlot(COMPETITION_ID, 'anon-1', 1)).resolves.toBe(true);
     });
 
     it('既に予約済み(一意制約違反)の場合、falseを返す', async () => {
@@ -49,7 +49,7 @@ describe('VoteRepository', () => {
       );
       const repository = new VoteRepository();
 
-      await expect(repository.reserveVoteSlot(COMPETITION_ID, 'anon-1')).resolves.toBe(false);
+      await expect(repository.reserveVoteSlot(COMPETITION_ID, 'anon-1', 1)).resolves.toBe(false);
     });
 
     it('一意制約違反以外のDBエラー時は例外をスローする', async () => {
@@ -58,7 +58,7 @@ describe('VoteRepository', () => {
       );
       const repository = new VoteRepository();
 
-      await expect(repository.reserveVoteSlot(COMPETITION_ID, 'anon-1')).rejects.toThrow(
+      await expect(repository.reserveVoteSlot(COMPETITION_ID, 'anon-1', 1)).rejects.toThrow(
         '投票枠の確保に失敗しました',
       );
     });
@@ -71,7 +71,9 @@ describe('VoteRepository', () => {
       );
       const repository = new VoteRepository();
 
-      await expect(repository.releaseVoteSlot(COMPETITION_ID, 'anon-1')).resolves.toBeUndefined();
+      await expect(
+        repository.releaseVoteSlot(COMPETITION_ID, 'anon-1', 1),
+      ).resolves.toBeUndefined();
     });
 
     it('DBエラー時は例外をスローする', async () => {
@@ -80,7 +82,7 @@ describe('VoteRepository', () => {
       );
       const repository = new VoteRepository();
 
-      await expect(repository.releaseVoteSlot(COMPETITION_ID, 'anon-1')).rejects.toThrow(
+      await expect(repository.releaseVoteSlot(COMPETITION_ID, 'anon-1', 1)).rejects.toThrow(
         '投票枠の解放に失敗しました',
       );
     });
@@ -110,8 +112,8 @@ describe('VoteRepository', () => {
       const repository = new VoteRepository();
 
       const result = await repository.createMany([
-        { competitionId: COMPETITION_ID, logoId: 'logo-1', voterAnonId: 'anon-1' },
-        { competitionId: COMPETITION_ID, logoId: 'logo-2', voterAnonId: 'anon-1' },
+        { competitionId: COMPETITION_ID, logoId: 'logo-1', voterAnonId: 'anon-1', round: 1 },
+        { competitionId: COMPETITION_ID, logoId: 'logo-2', voterAnonId: 'anon-1', round: 1 },
       ]);
 
       expect(result).toHaveLength(2);
@@ -126,7 +128,7 @@ describe('VoteRepository', () => {
 
       await expect(
         repository.createMany([
-          { competitionId: COMPETITION_ID, logoId: 'logo-1', voterAnonId: 'anon-1' },
+          { competitionId: COMPETITION_ID, logoId: 'logo-1', voterAnonId: 'anon-1', round: 1 },
         ]),
       ).rejects.toThrow('Voteの作成に失敗しました');
     });
@@ -139,7 +141,7 @@ describe('VoteRepository', () => {
       );
       const repository = new VoteRepository();
 
-      const result = await repository.countByAnonId(COMPETITION_ID, 'anon-1');
+      const result = await repository.countByAnonId(COMPETITION_ID, 'anon-1', 1);
 
       expect(result).toBe(3);
     });
@@ -150,7 +152,7 @@ describe('VoteRepository', () => {
       );
       const repository = new VoteRepository();
 
-      const result = await repository.countByAnonId(COMPETITION_ID, 'anon-1');
+      const result = await repository.countByAnonId(COMPETITION_ID, 'anon-1', 1);
 
       expect(result).toBe(0);
     });
@@ -245,7 +247,7 @@ describe('VoteRepository', () => {
       );
       const repository = new VoteRepository();
 
-      const result = await repository.countByLogoId(COMPETITION_ID);
+      const result = await repository.countByLogoId(COMPETITION_ID, 1);
 
       expect(result).toEqual({ 'logo-1': 2, 'logo-2': 1 });
     });

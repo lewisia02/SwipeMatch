@@ -11,6 +11,10 @@ import type { Competition } from '@/lib/types/Competition';
 
 type LoadStatus = 'loading' | 'loaded' | 'error';
 
+// この画面はコンペ一覧の表示・作成・終了・削除のみを扱い、ランオフの状態は関知しないため、
+// Competitionドメイン型から`runoffRound`を除いたビュー用の型を使う
+type CompetitionListItem = Omit<Competition, 'runoffRound'>;
+
 interface ToastState {
   message: string;
   variant: 'success' | 'error' | 'info';
@@ -26,7 +30,7 @@ interface CompetitionJson {
   closedAt: string | null;
 }
 
-function toCompetition(json: CompetitionJson): Competition {
+function toCompetition(json: CompetitionJson): CompetitionListItem {
   return {
     ...json,
     createdAt: new Date(json.createdAt),
@@ -36,14 +40,14 @@ function toCompetition(json: CompetitionJson): Competition {
 
 export function AdminCompetitionListClient() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
-  const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [competitions, setCompetitions] = useState<CompetitionListItem[]>([]);
   const [title, setTitle] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [appOrigin, setAppOrigin] = useState('');
-  const [deletingCompetition, setDeletingCompetition] = useState<Competition | null>(null);
+  const [deletingCompetition, setDeletingCompetition] = useState<CompetitionListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {

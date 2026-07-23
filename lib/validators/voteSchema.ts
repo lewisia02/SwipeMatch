@@ -11,3 +11,9 @@ export const submitVotesSchema = z.object({
 });
 
 export type SubmitVotesInput = z.infer<typeof submitVotesSchema>;
+
+export const submitRunoffVoteSchema = z.object({
+  logoId: z.string().min(1, '投票する作品を選択してください'),
+});
+
+export type SubmitRunoffVoteInput = z.infer<typeof submitRunoffVoteSchema>;

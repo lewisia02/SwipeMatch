@@ -29,6 +29,10 @@ const mockVoteRepository = {
   deleteLocksByCompetitionId: vi.fn().mockResolvedValue(undefined),
 };
 
+const mockRunoffRoundRepository = {
+  deleteAllByCompetitionId: vi.fn().mockResolvedValue(undefined),
+};
+
 vi.mock('@/lib/repositories/CompetitionRepository', () => ({
   CompetitionRepository: vi.fn().mockImplementation(() => mockCompetitionRepository),
 }));
@@ -39,6 +43,10 @@ vi.mock('@/lib/repositories/LogoRepository', () => ({
 
 vi.mock('@/lib/repositories/VoteRepository', () => ({
   VoteRepository: vi.fn().mockImplementation(() => mockVoteRepository),
+}));
+
+vi.mock('@/lib/repositories/RunoffRoundRepository', () => ({
+  RunoffRoundRepository: vi.fn().mockImplementation(() => mockRunoffRoundRepository),
 }));
 
 const { DELETE: deleteCompetition } = await import('@/app/api/admin/competitions/[id]/route');
@@ -73,6 +81,7 @@ function buildCompetition(overrides: Partial<Competition> = {}): Competition {
     title: '第1回ロゴ作成大会',
     status: 'closed',
     currentPhase: 'results',
+    runoffRound: null,
     createdAt: new Date('2026-07-18T00:00:00.000Z'),
     closedAt: new Date('2026-07-19T00:00:00.000Z'),
     ...overrides,
@@ -150,6 +159,7 @@ describe('DELETE /api/admin/competitions/[id]', () => {
     expect(mockLogoRepository.deleteStorageObject).toHaveBeenCalledWith('abc.jpg');
     expect(mockLogoRepository.deleteAllByCompetitionId).toHaveBeenCalledWith(COMPETITION_ID);
     expect(mockVoteRepository.deleteLocksByCompetitionId).toHaveBeenCalledWith(COMPETITION_ID);
+    expect(mockRunoffRoundRepository.deleteAllByCompetitionId).toHaveBeenCalledWith(COMPETITION_ID);
     expect(mockCompetitionRepository.delete).toHaveBeenCalledWith(COMPETITION_ID);
   });
 });

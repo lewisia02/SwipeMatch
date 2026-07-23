@@ -72,6 +72,17 @@ vi.mock('@/lib/repositories/VoteRepository', () => {
   };
 });
 
+vi.mock('@/lib/repositories/RunoffRoundRepository', () => {
+  return {
+    RunoffRoundRepository: vi.fn().mockImplementation(() => ({
+      findAllByCompetitionId: vi.fn().mockResolvedValue([]),
+      findLatestRound: vi.fn().mockResolvedValue(null),
+      createRound: vi.fn(),
+      resolveAsJointWinner: vi.fn(),
+    })),
+  };
+});
+
 const { GET: getResults } = await import('@/app/api/admin/competitions/[id]/results/route');
 const { GET: getResultsExport } = await import(
   '@/app/api/admin/competitions/[id]/results/export/route'

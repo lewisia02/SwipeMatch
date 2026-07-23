@@ -37,6 +37,7 @@ const ROW = {
   title: '第1回ロゴ作成大会',
   status: 'active' as const,
   current_phase: 'submission' as const,
+  runoff_round: null,
   created_at: '2026-07-20T00:00:00.000Z',
   closed_at: null,
 };
@@ -146,6 +147,33 @@ describe('CompetitionRepository', () => {
       const result = await repository.updatePhase('competition-1', 'voting');
 
       expect(result.currentPhase).toBe('voting');
+    });
+  });
+
+  describe('updateRunoffRound', () => {
+    it('runoffRoundを更新したCompetitionを返す', async () => {
+      vi.mocked(getSupabaseClient).mockReturnValue(
+        mockSupabaseClient({
+          data: { ...ROW, runoff_round: 2 },
+          error: null,
+        }) as never,
+      );
+      const repository = new CompetitionRepository();
+
+      const result = await repository.updateRunoffRound('competition-1', 2);
+
+      expect(result.runoffRound).toBe(2);
+    });
+
+    it('nullを渡すとrunoffRoundをnullに更新する', async () => {
+      vi.mocked(getSupabaseClient).mockReturnValue(
+        mockSupabaseClient({ data: ROW, error: null }) as never,
+      );
+      const repository = new CompetitionRepository();
+
+      const result = await repository.updateRunoffRound('competition-1', null);
+
+      expect(result.runoffRound).toBeNull();
     });
   });
 });

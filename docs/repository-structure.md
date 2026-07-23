@@ -16,7 +16,8 @@ project-root/
 │   │       ├── upload/        # S-02 画像投稿画面
 │   │       └── vote/
 │   │           ├── swipe/     # S-03 スワイプ1次選考画面
-│   │           └── final/     # S-04 決選投票画面
+│   │           ├── final/     # S-04 決選投票画面
+│   │           └── runoff/    # S-09 ランオフ投票画面
 │   ├── admin/
 │   │   ├── login/           # S-05 管理者ログイン画面
 │   │   ├── page.tsx         # S-08 管理者コンペ一覧画面(開催・過去コンペ一覧)
@@ -32,7 +33,9 @@ project-root/
 │       │       ├── logos/
 │       │       │   └── upload-url/  # 署名付きアップロードURL発行
 │       │       ├── votes/
-│       │       └── phase/
+│       │       │   └── runoff/      # ランオフ投票
+│       │       ├── phase/
+│       │       └── runoff/          # ランオフ対象Logo・参加資格・投票済み状況の取得
 │       └── admin/
 │           ├── login/
 │           └── competitions/
@@ -41,6 +44,10 @@ project-root/
 │                   ├── route.ts     # コンペの完全削除(DELETE)
 │                   ├── phase/
 │                   ├── stats/       # 投稿数・投稿詳細・投票状況の集計取得
+│                   ├── runoff/
+│                   │   ├── start/    # ランオフの開始(初回開始／再投票)
+│                   │   ├── close/    # ランオフの締切
+│                   │   └── resolve/  # ランオフの同率優勝確定
 │                   └── results/
 │                       ├── export/    # 結果ランキングのCSVエクスポート
 │                       └── timeline/  # 投票タイムライン取得(結果発表画面のタイムラプス演出用)
@@ -70,7 +77,7 @@ project-root/
 
 #### app/(グローバルページ) / app/c/[slug]/(参加者向けページ)
 
-**役割**: `docs/ui-design.md` の画面一覧(S-01〜S-04)に対応するページを、コンペ専用URL `app/c/[slug]/` 配下に配置する。`app/page.tsx`はコンペに紐付かないグローバルなリダイレクト専用ページ
+**役割**: `docs/ui-design.md` の画面一覧(S-01〜S-04, S-09)に対応するページを、コンペ専用URL `app/c/[slug]/` 配下に配置する。`app/page.tsx`はコンペに紐付かないグローバルなリダイレクト専用ページ
 
 **配置ファイル**:
 - `app/page.tsx`: グローバルトップ。`CompetitionService.findActive()`を呼び、開催中コンペがあれば「投票に参加する」ボタン（`/c/{slug}`）、無ければ案内メッセージを表示するServer Component。自動`redirect()`は行わない。常に「管理者はこちら」（`/admin`）リンクを表示する
@@ -79,6 +86,7 @@ project-root/
 - `app/c/[slug]/upload/page.tsx`: S-02 画像投稿画面
 - `app/c/[slug]/vote/swipe/page.tsx`: S-03 スワイプ1次選考画面
 - `app/c/[slug]/vote/final/page.tsx`: S-04 決選投票画面
+- `app/c/[slug]/vote/runoff/page.tsx`: S-09 ランオフ投票画面
 - `app/layout.tsx`: 全画面共通レイアウト
 - `app/globals.css`: グローバルスタイル(Tailwindのベース)
 
@@ -117,12 +125,17 @@ project-root/
 - `app/api/c/[slug]/logos/upload-url/route.ts`: `POST /api/c/[slug]/logos/upload-url`
 - `app/api/c/[slug]/logos/route.ts`: `POST /api/c/[slug]/logos` / `GET /api/c/[slug]/logos`
 - `app/api/c/[slug]/votes/route.ts`: `POST /api/c/[slug]/votes`
+- `app/api/c/[slug]/votes/runoff/route.ts`: `POST /api/c/[slug]/votes/runoff`
 - `app/api/c/[slug]/phase/route.ts`: `GET /api/c/[slug]/phase`
+- `app/api/c/[slug]/runoff/route.ts`: `GET /api/c/[slug]/runoff`
 - `app/api/admin/login/route.ts`: `POST /api/admin/login`
 - `app/api/admin/competitions/route.ts`: `GET /api/admin/competitions` / `POST /api/admin/competitions`
 - `app/api/admin/competitions/[id]/route.ts`: `DELETE /api/admin/competitions/[id]`
 - `app/api/admin/competitions/[id]/phase/route.ts`: `POST /api/admin/competitions/[id]/phase`
 - `app/api/admin/competitions/[id]/stats/route.ts`: `GET /api/admin/competitions/[id]/stats`
+- `app/api/admin/competitions/[id]/runoff/start/route.ts`: `POST /api/admin/competitions/[id]/runoff/start`
+- `app/api/admin/competitions/[id]/runoff/close/route.ts`: `POST /api/admin/competitions/[id]/runoff/close`
+- `app/api/admin/competitions/[id]/runoff/resolve/route.ts`: `POST /api/admin/competitions/[id]/runoff/resolve`
 - `app/api/admin/competitions/[id]/results/route.ts`: `GET /api/admin/competitions/[id]/results`
 - `app/api/admin/competitions/[id]/results/export/route.ts`: `GET /api/admin/competitions/[id]/results/export`
 - `app/api/admin/competitions/[id]/results/timeline/route.ts`: `GET /api/admin/competitions/[id]/results/timeline`
@@ -153,7 +166,7 @@ project-root/
 **役割**: `docs/ui-design.md` の共通コンポーネント一覧に対応するReactコンポーネントを配置する
 
 **配置ファイル**:
-- `Button.tsx`, `Input.tsx`, `Textarea.tsx`, `Toast.tsx`, `ProgressBar.tsx`, `Badge.tsx`, `ConfirmDialog.tsx`, `NameGate.tsx`（`/c/[slug]`配下共通の参加者名入力ゲート）, `SwipeCard.tsx`, `SelectableGrid.tsx`, `QRCodeDisplay.tsx`（画面固有, S-06/S-08）, `RankingList.tsx`（画面固有, S-07。発表開始前の静的表示用）, `VoteTimelapseChart.tsx`（画面固有, S-07。`framer-motion`による投票タイムラプス演出用）, `AnimatedRankingList.tsx`（画面固有, S-07。`framer-motion`によるスライドイン・カウントアップ演出用）, `CompetitionCard.tsx`（画面固有, S-08）, `DeleteCompetitionDialog.tsx`（画面固有, S-08。コンペ削除の確認）
+- `Button.tsx`, `Input.tsx`, `Textarea.tsx`, `Toast.tsx`, `ProgressBar.tsx`, `Badge.tsx`（同着・同率優勝表示用の`success`バリアントを含む）, `ConfirmDialog.tsx`, `NameGate.tsx`（`/c/[slug]`配下共通の参加者名入力ゲート）, `SwipeCard.tsx`, `SelectableGrid.tsx`（S-04・S-09で`maxSelectable`により単一/複数選択を切り替えて共用）, `Counter.tsx`（S-04・S-09で共用）, `QRCodeDisplay.tsx`（画面固有, S-06/S-08）, `RankingList.tsx`（画面固有, S-07。発表開始前の静的表示用）, `VoteTimelapseChart.tsx`（画面固有, S-07。`framer-motion`による投票タイムラプス演出用）, `AnimatedRankingList.tsx`（画面固有, S-07。`framer-motion`によるスライドイン・カウントアップ演出用）, `CompetitionCard.tsx`（画面固有, S-08）, `DeleteCompetitionDialog.tsx`（画面固有, S-08。コンペ削除の確認）
 
 **命名規則**:
 - PascalCase（例: `SwipeCard.tsx`）
@@ -192,7 +205,7 @@ lib/services/
 **役割**: Supabase Database/Storageへのアクセスをカプセル化する。`LogoRepository`は画像アップロード用の署名付きURL発行・Storageオブジェクト削除も担い、`UploadService`を含むサービスレイヤーがSupabaseクライアントへ直接アクセスしないようにする
 
 **配置ファイル**:
-- `CompetitionRepository.ts`（旧`AppSettingsRepository.ts`を置き換え。コンペのCRUD・slug解決・フェーズ更新を担う）, `LogoRepository.ts`, `VoteRepository.ts`
+- `CompetitionRepository.ts`（旧`AppSettingsRepository.ts`を置き換え。コンペのCRUD・slug解決・フェーズ更新・ランオフラウンド更新を担う）, `LogoRepository.ts`, `VoteRepository.ts`, `RunoffRoundRepository.ts`（ランオフ各ラウンドの対象Logo・解決状況のCRUD）
 
 **命名規則**: PascalCase + `Repository`接尾辞
 
@@ -268,7 +281,7 @@ lib/client/
 **役割**: `docs/functional-design.md` のデータモデル定義(`Competition` / `Logo` / `Vote`等)をTypeScriptの型として配置する
 
 **配置ファイル**:
-- `Competition.ts`（`EventPhase`/`CompetitionStatus`を含む。旧`AppSettings.ts`を置き換え）, `Logo.ts`, `Vote.ts`, `RankedLogo.ts`（結果発表のランキング表示用。`Logo`を拡張し`voteCount`/`rank`/`isTiedForRunoff`を追加）
+- `Competition.ts`（`EventPhase`/`CompetitionStatus`を含む。旧`AppSettings.ts`を置き換え。`EventPhase`は`'submission' | 'voting' | 'results' | 'runoff' | 'ended'`）, `Logo.ts`, `Vote.ts`（`round`フィールドと定数`FINAL_VOTE_ROUND`を含む）, `RunoffRound.ts`（ランオフ各ラウンドの対象Logo・解決状況）, `RankedLogo.ts`（結果発表のランキング表示用。`Logo`を拡張し`voteCount`/`rank`/`isTiedForRunoff`/`isJointWinner`を追加）
 
 **命名規則**: PascalCase（エンティティ名と一致させる）
 
@@ -278,7 +291,7 @@ lib/client/
 
 ### lib/errors.ts (共通エラークラス)
 
-**役割**: `docs/development-guidelines.md`・`docs/glossary.md`で定義するカスタムエラークラス（`ValidationError` / `PhaseMismatchError` / `DuplicateVoteError` / `UnauthorizedError`）を配置する単一ファイル
+**役割**: `docs/development-guidelines.md`・`docs/glossary.md`で定義するカスタムエラークラス（`ValidationError` / `PhaseMismatchError` / `DuplicateVoteError` / `UnauthorizedError` / `NotFoundError` / `RunoffNotOpenError` / `RunoffNotEligibleError`）を配置する単一ファイル
 
 **命名規則**: PascalCase + `Error`接尾辞のクラスをファイル内にまとめて定義する
 
@@ -346,8 +359,8 @@ tests/e2e/
 ### scripts/ (スクリプトディレクトリ)
 
 **配置ファイル**:
-- `schema.sql`: 新規Supabaseプロジェクトへのフルインストール用（`competitions` / `logos` / `votes` / `vote_locks`テーブル作成用SQL。最終形であり`app_settings`は含まない）
-- `migrations/`: 既存データを持つ環境向けの、既存スキーマからの変更差分SQL（コンペ機能導入時の`0001_add_competitions.sql`等。`docs/architecture.md`のマイグレーション戦略を参照）
+- `schema.sql`: 新規Supabaseプロジェクトへのフルインストール用（`competitions` / `logos` / `votes` / `vote_locks` / `runoff_rounds`テーブル作成用SQL。最終形であり`app_settings`は含まない）
+- `migrations/`: 既存データを持つ環境向けの、既存スキーマからの変更差分SQL（コンペ機能導入時の`0001_add_competitions.sql`、ランオフ機能導入時の`0003_add_runoff.sql`等。`docs/architecture.md`のマイグレーション戦略を参照）
 - 開発補助スクリプト（例: ローカル環境でのシード投入）
 
 **命名規則（`scripts/migrations/`）**: `[4桁連番]_[変更内容をsnake_case].sql`（例: `0001_add_competitions.sql`）。連番順に適用する前提とし、適用済みマイグレーションは書き換えない

@@ -2,7 +2,7 @@ import { NotFoundError, PhaseMismatchError, ValidationError } from '@/lib/errors
 import type { CompetitionRepository } from '@/lib/repositories/CompetitionRepository';
 import type { EventPhase } from '@/lib/types/Competition';
 
-const PHASE_ORDER: EventPhase[] = ['submission', 'voting', 'results', 'ended'];
+const PHASE_ORDER: EventPhase[] = ['submission', 'voting', 'results', 'runoff', 'ended'];
 
 export class PhaseService {
   constructor(private competitionRepository: CompetitionRepository) {}

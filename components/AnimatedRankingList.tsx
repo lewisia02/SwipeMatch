@@ -110,6 +110,7 @@ export function AnimatedRankingList({ items, isPlaying, onComplete }: AnimatedRa
               <div className="flex items-center gap-2">
                 <span className="font-display text-h2">{item.uploaderName}</span>
                 {item.isTiedForRunoff && <Badge variant="warning">同着（ランオフ対象）</Badge>}
+                {item.isJointWinner && <Badge variant="success">🤝 同率</Badge>}
               </div>
               <p className="text-body text-text-muted">&ldquo;{item.memo}&rdquo;</p>
             </div>

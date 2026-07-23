@@ -11,11 +11,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     await requireAdminSession(request, adminService);
 
     const { id } = await params;
-    await competitionService.findById(id);
+    const competition = await competitionService.findById(id);
 
     const results = await adminService.getRankedResults(id);
 
-    return NextResponse.json({ results });
+    return NextResponse.json({
+      results,
+      phase: competition.currentPhase,
+      runoffRound: competition.runoffRound,
+    });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ message: error.message }, { status: 401 });

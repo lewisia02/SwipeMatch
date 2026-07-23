@@ -17,6 +17,7 @@ function createMockRepository(currentPhase: EventPhase | null) {
             title: 'テストコンペ',
             status: 'active',
             currentPhase,
+            runoffRound: null,
             createdAt: new Date(),
             closedAt: null,
           } satisfies Competition),
@@ -121,6 +122,33 @@ describe('PhaseService', () => {
       const service = new PhaseService(repository);
 
       await expect(service.transitionTo(COMPETITION_ID, 'submission')).rejects.toThrow(
+        ValidationError,
+      );
+    });
+
+    it('resultsからrunoffへの遷移は許可される', async () => {
+      const repository = createMockRepository('results');
+      const service = new PhaseService(repository);
+
+      await service.transitionTo(COMPETITION_ID, 'runoff');
+
+      expect(repository.updatePhase).toHaveBeenCalledWith(COMPETITION_ID, 'runoff');
+    });
+
+    it('runoffからendedへの遷移は許可される', async () => {
+      const repository = createMockRepository('runoff');
+      const service = new PhaseService(repository);
+
+      await service.transitionTo(COMPETITION_ID, 'ended');
+
+      expect(repository.updatePhase).toHaveBeenCalledWith(COMPETITION_ID, 'ended');
+    });
+
+    it('runoffからresultsへの逆行遷移はValidationErrorをスローする', async () => {
+      const repository = createMockRepository('runoff');
+      const service = new PhaseService(repository);
+
+      await expect(service.transitionTo(COMPETITION_ID, 'results')).rejects.toThrow(
         ValidationError,
       );
     });

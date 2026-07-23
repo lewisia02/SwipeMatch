@@ -45,6 +45,7 @@ function createMockCompetitionRepository(status: Competition['status'] = 'active
       title: 'テストコンペ',
       status,
       currentPhase: 'submission',
+      runoffRound: null,
       createdAt: new Date(),
       closedAt: status === 'closed' ? new Date() : null,
     } satisfies Competition),

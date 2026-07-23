@@ -10,23 +10,36 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { Toast } from '@/components/Toast';
 import type { EventPhase } from '@/lib/types/Competition';
 
-const PHASE_ORDER: EventPhase[] = ['submission', 'voting', 'results', 'ended'];
+// 'runoff'は結果発表画面の専用操作（ランオフ開始・締切・再投票・同率優勝）からのみ遷移させ、
+// この汎用フェーズ切替ボタン群には含めない（対象Logoのスナップショット作成を伴うため）
+type ManualPhase = 'submission' | 'voting' | 'results' | 'ended';
+
+const PHASE_ORDER: ManualPhase[] = ['submission', 'voting', 'results', 'ended'];
+
+const PHASE_RANK: Record<EventPhase, number> = {
+  submission: 0,
+  voting: 1,
+  results: 2,
+  runoff: 3,
+  ended: 4,
+};
 
 const PHASE_LABELS: Record<EventPhase, string> = {
   submission: '投稿受付中',
   voting: '投票中',
   results: '結果発表中',
+  runoff: 'ランオフ実施中',
   ended: '終了',
 };
 
-const PHASE_BUTTON_LABELS: Record<EventPhase, string> = {
+const PHASE_BUTTON_LABELS: Record<ManualPhase, string> = {
   submission: '投稿受付開始',
   voting: '投票開始',
   results: '結果発表',
   ended: 'コンペを終了する',
 };
 
-const PHASE_CONFIRM_MESSAGES: Record<EventPhase, string> = {
+const PHASE_CONFIRM_MESSAGES: Record<ManualPhase, string> = {
   submission: '投稿受付フェーズに切り替えます。よろしいですか？',
   voting: '投票フェーズに切り替えます。投稿は締め切られます。よろしいですか？',
   results: '結果発表フェーズに切り替えます。投票は締め切られます。よろしいですか？',
@@ -63,7 +76,7 @@ interface AdminCompetitionClientProps {
 export function AdminCompetitionClient({ id, slug, title, initialPhase }: AdminCompetitionClientProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<EventPhase>(initialPhase);
-  const [confirmingPhase, setConfirmingPhase] = useState<EventPhase | null>(null);
+  const [confirmingPhase, setConfirmingPhase] = useState<ManualPhase | null>(null);
   const [switching, setSwitching] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [appOrigin, setAppOrigin] = useState('');
@@ -200,8 +213,7 @@ export function AdminCompetitionClient({ id, slug, title, initialPhase }: AdminC
 
         <div className="flex flex-wrap gap-3">
           {PHASE_ORDER.map((targetPhase) => {
-            const isDisabled =
-              PHASE_ORDER.indexOf(targetPhase) <= PHASE_ORDER.indexOf(phase) || switching;
+            const isDisabled = PHASE_RANK[targetPhase] <= PHASE_RANK[phase] || switching;
             const isCurrent = phase === targetPhase;
             return (
               <Button
