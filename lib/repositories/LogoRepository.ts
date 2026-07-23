@@ -75,6 +75,17 @@ export class LogoRepository {
     }
   }
 
+  // コンペ削除用。votes.logo_idにON DELETE CASCADEがあるため、
+  // logos削除だけで紐づくvotes行も自動的に削除される
+  async deleteAllByCompetitionId(competitionId: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from('logos').delete().eq('competition_id', competitionId);
+
+    if (error) {
+      throw new Error(`Logo一括削除に失敗しました: ${error.message}`);
+    }
+  }
+
   async createSignedUploadUrl(contentType: string): Promise<{ uploadUrl: string; storagePath: string }> {
     const supabase = getSupabaseClient();
     const extension = EXTENSION_BY_CONTENT_TYPE[contentType] ?? 'jpg';

@@ -13,7 +13,7 @@ export function Textarea({ label, error, id, className = '', ...rest }: Textarea
       </label>
       <textarea
         id={id}
-        className={`rounded-md border px-3 py-2 ${error ? 'border-danger' : 'border-gray-300'} ${className}`}
+        className={`rounded-md border bg-paper px-3 py-2 outline-none transition-colors focus:border-secondary focus:ring-1 focus:ring-secondary ${error ? 'border-danger' : 'border-text-muted/30'} ${className}`}
         {...rest}
       />
       {error && <p className="text-xs text-danger">{error}</p>}

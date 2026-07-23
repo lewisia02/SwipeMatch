@@ -7,6 +7,7 @@ interface CompetitionRow {
   title: string;
   status: 'active' | 'closed';
   current_phase: EventPhase;
+  runoff_round: number | null;
   created_at: string;
   closed_at: string | null;
 }
@@ -18,6 +19,7 @@ function toCompetition(row: CompetitionRow): Competition {
     title: row.title,
     status: row.status,
     currentPhase: row.current_phase,
+    runoffRound: row.runoff_round,
     createdAt: new Date(row.created_at),
     closedAt: row.closed_at ? new Date(row.closed_at) : null,
   };
@@ -116,6 +118,15 @@ export class CompetitionRepository {
     return (data as CompetitionRow[]).map(toCompetition);
   }
 
+  async delete(id: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    const { error } = await supabase.from('competitions').delete().eq('id', id);
+
+    if (error) {
+      throw new Error(`Competitionの削除に失敗しました: ${error.message}`);
+    }
+  }
+
   async updatePhase(id: string, phase: EventPhase): Promise<Competition> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
@@ -127,6 +138,22 @@ export class CompetitionRepository {
 
     if (error) {
       throw new Error(`Competitionのフェーズ更新に失敗しました: ${error.message}`);
+    }
+
+    return toCompetition(data as CompetitionRow);
+  }
+
+  async updateRunoffRound(id: string, round: number | null): Promise<Competition> {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('competitions')
+      .update({ runoff_round: round })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Competitionのランオフラウンド更新に失敗しました: ${error.message}`);
     }
 
     return toCompetition(data as CompetitionRow);

@@ -14,7 +14,7 @@ describe('adminLoginSchema', () => {
 });
 
 describe('adminPhaseSchema', () => {
-  it.each(['submission', 'voting', 'results'])('%sは有効な値として受け入れる', (phase) => {
+  it.each(['submission', 'voting', 'results', 'ended'])('%sは有効な値として受け入れる', (phase) => {
     const result = adminPhaseSchema.safeParse({ phase });
     expect(result.success).toBe(true);
   });

@@ -27,6 +27,20 @@ export class DuplicateVoteError extends Error {
   }
 }
 
+export class RunoffNotOpenError extends Error {
+  constructor() {
+    super('ランオフの投票受付中ではありません');
+    this.name = 'RunoffNotOpenError';
+  }
+}
+
+export class RunoffNotEligibleError extends Error {
+  constructor() {
+    super('通常の決選投票をしていないため、ランオフには参加できません');
+    this.name = 'RunoffNotEligibleError';
+  }
+}
+
 export class UnauthorizedError extends Error {
   constructor() {
     super('認証が必要です');

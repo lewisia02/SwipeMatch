@@ -1,6 +1,8 @@
 'use client';
 
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import { ColorBar } from '@/components/ColorBar';
+import { CropMarks } from '@/components/CropMarks';
 import type { Logo } from '@/lib/types/Logo';
 
 const SWIPE_THRESHOLD = 100;
@@ -35,26 +37,30 @@ export function SwipeCard({ logo, onSwipe }: SwipeCardProps) {
   }
 
   return (
-    <div className="relative">
-      <motion.div
-        className="relative overflow-hidden rounded-md bg-white shadow"
-        style={{ x }}
-        drag="x"
-        dragElastic={0.6}
-        onDragEnd={handleDragEnd}
-      >
+    <div>
+      <div className="relative">
+        <CropMarks />
         <motion.div
-          className="pointer-events-none absolute inset-0 z-10 bg-primary/30"
-          style={{ opacity: keepOpacity }}
-        />
-        <motion.div
-          className="pointer-events-none absolute inset-0 z-10 bg-skip/30"
-          style={{ opacity: skipOpacity }}
-        />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo.imageUrl} alt={logo.memo} className="aspect-square w-full object-cover" />
-        <p className="p-4 text-body">{logo.memo}</p>
-      </motion.div>
+          className="relative overflow-hidden rounded-sm bg-paper shadow"
+          style={{ x }}
+          drag="x"
+          dragElastic={0.6}
+          onDragEnd={handleDragEnd}
+        >
+          <motion.div
+            className="pointer-events-none absolute inset-0 z-10 bg-primary/30"
+            style={{ opacity: keepOpacity }}
+          />
+          <motion.div
+            className="pointer-events-none absolute inset-0 z-10 bg-skip/30"
+            style={{ opacity: skipOpacity }}
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logo.imageUrl} alt={logo.memo} className="aspect-square w-full object-cover" />
+          <ColorBar className="h-1.5" />
+          <p className="p-4 text-body">{logo.memo}</p>
+        </motion.div>
+      </div>
       <div className="mt-4 flex justify-between gap-4">
         <button
           type="button"

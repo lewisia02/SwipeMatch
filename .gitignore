@@ -10,3 +10,5 @@ next-env.d.ts
 .claude/settings.local.json
 .claude/skill-usage.jsonl
 .steering/
+.vercel
+.env*

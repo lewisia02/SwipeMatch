@@ -14,7 +14,7 @@ export function ProgressBar({ current, total }: ProgressBarProps) {
           style={{ width: `${percent}%` }}
         />
       </div>
-      <span className="text-caption text-text-muted">
+      <span className="font-mono text-caption text-text-muted">
         {current}/{total}
       </span>
     </div>

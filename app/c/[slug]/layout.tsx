@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { CompetitionProvider } from '@/app/c/[slug]/CompetitionContext';
+import { NameGate } from '@/components/NameGate';
 import { NotFoundError } from '@/lib/errors';
 import { createCompetitionService } from '@/lib/services/container';
 
@@ -20,7 +21,7 @@ export default async function CompetitionLayout({
     throw error;
   });
 
-  if (competition.status === 'closed') {
+  if (competition.status === 'closed' || competition.currentPhase === 'ended') {
     return (
       <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
         <h1 className="text-h1">🏆 {competition.title}</h1>
@@ -31,7 +32,7 @@ export default async function CompetitionLayout({
 
   return (
     <CompetitionProvider slug={competition.slug} title={competition.title}>
-      {children}
+      <NameGate>{children}</NameGate>
     </CompetitionProvider>
   );
 }

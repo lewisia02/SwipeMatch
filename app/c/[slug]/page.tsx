@@ -3,50 +3,47 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useCompetition } from '@/app/c/[slug]/CompetitionContext';
-import type { EventPhase } from '@/lib/types/Competition';
+import { ColorBar } from '@/components/ColorBar';
+import { usePhasePolling } from '@/lib/client/usePhasePolling';
+import { hasVoted } from '@/lib/client/voteSession';
+import { FINAL_VOTE_ROUND } from '@/lib/types/Vote';
 
-type PhaseCheckStatus = 'loading' | 'loaded' | 'unknown';
+function messageForVotedPhase(phase: string | null): string {
+  if (phase === 'results') {
+    return 'ただいま結果発表中です。会場の画面をご確認ください';
+  }
+  if (phase === 'ended') {
+    return 'コンペは終了しました。ご参加ありがとうございました';
+  }
+  return '投票ありがとうございました。結果発表をお楽しみに🎉';
+}
 
 export default function CompetitionTopPage() {
   const { slug, title } = useCompetition();
-  const [phaseCheckStatus, setPhaseCheckStatus] = useState<PhaseCheckStatus>('loading');
-  const [phase, setPhase] = useState<EventPhase | null>(null);
+  const { phase, runoffRound, status: phaseCheckStatus } = usePhasePolling(slug);
+  const [voted, setVoted] = useState(false);
+  const [votedRunoffRound, setVotedRunoffRound] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    fetch(`/api/c/${slug}/phase`)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error('フェーズの取得に失敗しました');
-        }
-        return res.json();
-      })
-      .then((body: { phase: EventPhase }) => {
-        if (!cancelled) {
-          setPhase(body.phase);
-          setPhaseCheckStatus('loaded');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPhaseCheckStatus('unknown');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    setVoted(hasVoted(slug, FINAL_VOTE_ROUND));
   }, [slug]);
+
+  useEffect(() => {
+    if (phase === 'runoff' && runoffRound !== null) {
+      setVotedRunoffRound(hasVoted(slug, runoffRound));
+    }
+  }, [slug, phase, runoffRound]);
 
   // loading中・取得失敗時は両ボタンを活性のままにする（遷移先で個別にフェーズチェックされるため）
   const isSubmissionOpen = phaseCheckStatus !== 'loaded' || phase === 'submission';
-  const isVotingOpen = phaseCheckStatus !== 'loaded' || phase !== 'submission';
+  const isVotingOpen = !voted && (phaseCheckStatus !== 'loaded' || phase === 'voting' || phase === 'results');
+  const isRunoffOpen = phase === 'runoff' && runoffRound !== null && !votedRunoffRound;
 
   if (phaseCheckStatus === 'loading') {
     return (
       <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-        <h1 className="text-h1">🏆 {title}</h1>
+        <h1 className="font-display text-h1">{title}</h1>
+        <ColorBar className="h-1 w-16 rounded-full" />
         <p className="text-body text-text-muted">
           ロゴ作成大会に参加したみなさんのロゴを投稿・投票して優勝作品を決めましょう。
         </p>
@@ -58,7 +55,8 @@ export default function CompetitionTopPage() {
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-      <h1 className="text-h1">🏆 {title}</h1>
+      <h1 className="font-display text-h1">{title}</h1>
+      <ColorBar className="h-1 w-16 rounded-full" />
       <p className="text-body text-text-muted">
         ロゴ作成大会に参加したみなさんのロゴを投稿・投票して優勝作品を決めましょう。
       </p>
@@ -77,20 +75,39 @@ export default function CompetitionTopPage() {
           📤 画像を投稿する
         </Link>
       ) : (
-        <span className="rounded-md bg-primary/50 px-4 py-3 text-center font-semibold text-white">
+        <span className="rounded-md bg-bg-muted px-4 py-3 text-center font-semibold text-text-muted">
           📤 画像を投稿する（受付終了）
         </span>
       )}
 
-      {isVotingOpen ? (
+      {phase === 'runoff' ? (
+        isRunoffOpen ? (
+          <Link
+            href={`/c/${slug}/vote/runoff`}
+            className="rounded-md bg-secondary px-4 py-3 text-center font-semibold text-white"
+          >
+            ⚖️ ランオフ投票へ進む
+          </Link>
+        ) : (
+          <p className="rounded-md bg-bg-muted px-4 py-3 text-center text-text-muted">
+            {runoffRound === null
+              ? '同着があったため、ランオフを集計中です。会場の画面をご確認ください'
+              : 'ランオフ投票ありがとうございました。結果発表をお楽しみに🎉'}
+          </p>
+        )
+      ) : isVotingOpen ? (
         <Link
           href={`/c/${slug}/vote/swipe`}
           className="rounded-md bg-secondary px-4 py-3 text-center font-semibold text-white"
         >
           🗳 投票へ進む
         </Link>
+      ) : voted ? (
+        <p className="rounded-md bg-bg-muted px-4 py-3 text-center text-text-muted">
+          {messageForVotedPhase(phase)}
+        </p>
       ) : (
-        <span className="rounded-md bg-secondary/50 px-4 py-3 text-center font-semibold text-white">
+        <span className="rounded-md bg-bg-muted px-4 py-3 text-center font-semibold text-text-muted">
           🗳 投票へ進む（準備中）
         </span>
       )}

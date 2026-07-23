@@ -17,5 +17,6 @@ export function rankWithTieDetection(logos: (Logo & { voteCount: number })[]): R
     isTiedForRunoff:
       logo.voteCount === topVoteCount &&
       sorted.filter((l) => l.voteCount === topVoteCount).length > 1,
+    isJointWinner: false,
   }));
 }

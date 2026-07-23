@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const TEST_SECRET = 'test-admin-session-secret-value';
 const COMPETITION_ID = 'competition-1';
 
-const mockCompetition = { currentPhase: 'results' as 'submission' | 'voting' | 'results' };
+const mockCompetition = { currentPhase: 'results' as 'submission' | 'voting' | 'results' | 'ended' };
 
 function buildCompetition() {
   return {
@@ -68,6 +68,17 @@ vi.mock('@/lib/repositories/VoteRepository', () => {
       releaseVoteSlot: vi.fn(),
       createMany: vi.fn(),
       countByAnonId: vi.fn(),
+    })),
+  };
+});
+
+vi.mock('@/lib/repositories/RunoffRoundRepository', () => {
+  return {
+    RunoffRoundRepository: vi.fn().mockImplementation(() => ({
+      findAllByCompetitionId: vi.fn().mockResolvedValue([]),
+      findLatestRound: vi.fn().mockResolvedValue(null),
+      createRound: vi.fn(),
+      resolveAsJointWinner: vi.fn(),
     })),
   };
 });
@@ -158,6 +169,21 @@ describe('GET /api/admin/competitions/[id]/results', () => {
     const body = await response.json();
     expect(body.results[0]).toMatchObject({ id: 'logo-2', voteCount: 8, rank: 1 });
     expect(body.results[1]).toMatchObject({ id: 'logo-1', voteCount: 3, rank: 2 });
+  });
+
+  it('endedフェーズ(resultsより後方)の場合でも、ランキングを返す（回帰確認）', async () => {
+    mockCompetition.currentPhase = 'ended';
+    const token = await buildValidToken();
+
+    const response = await getResults(
+      resultsRequest(
+        `http://localhost/api/admin/competitions/${COMPETITION_ID}/results`,
+        `admin_token=${token}`,
+      ),
+      idParams(),
+    );
+
+    expect(response.status).toBe(200);
   });
 });
 

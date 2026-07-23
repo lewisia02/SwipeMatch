@@ -7,7 +7,7 @@ export const adminLoginSchema = z.object({
 export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
 
 export const adminPhaseSchema = z.object({
-  phase: z.enum(['submission', 'voting', 'results'], {
+  phase: z.enum(['submission', 'voting', 'results', 'ended'], {
     message: '不正なフェーズ値です',
   }),
 });

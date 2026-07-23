@@ -9,7 +9,9 @@ import { Counter } from '@/components/Counter';
 import { SelectableGrid } from '@/components/SelectableGrid';
 import { Toast } from '@/components/Toast';
 import { SwipeSessionManager } from '@/lib/client/SwipeSessionManager';
+import { markVoted } from '@/lib/client/voteSession';
 import type { Logo } from '@/lib/types/Logo';
+import { FINAL_VOTE_ROUND } from '@/lib/types/Vote';
 
 const MAX_SELECTABLE = 3;
 
@@ -73,12 +75,6 @@ export default function FinalVotePage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  useEffect(() => {
-    if (submitStatus !== 'success') return;
-    const timer = setTimeout(() => router.push(`/c/${slug}`), 1500);
-    return () => clearTimeout(timer);
-  }, [submitStatus, router, slug]);
-
   function handleToggle(id: string) {
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id],
@@ -112,7 +108,9 @@ export default function FinalVotePage() {
       }
 
       setSubmitStatus('success');
+      markVoted(slug, FINAL_VOTE_ROUND);
       setToast({ message: '投票ありがとうございました', variant: 'success' });
+      setTimeout(() => router.push(`/c/${slug}`), 2000);
     } catch {
       setSubmitStatus('error');
       setToast({ message: 'エラーが発生しました。時間をおいて再度お試しください', variant: 'error' });

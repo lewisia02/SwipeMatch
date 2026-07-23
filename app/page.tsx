@@ -1,4 +1,5 @@
-import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { ColorBar } from '@/components/ColorBar';
 import { createCompetitionService } from '@/lib/services/container';
 
 // 開催中コンペは随時変わるため、ビルド時の静的プリレンダリングを避け常に実行時に評価する
@@ -8,14 +9,28 @@ export default async function GlobalTopPage() {
   const competitionService = createCompetitionService();
   const active = await competitionService.findActive();
 
-  if (active) {
-    redirect(`/c/${active.slug}`);
-  }
-
   return (
     <main className="mx-auto flex max-w-md flex-col items-center gap-4 p-6 text-center">
-      <h1 className="text-h1">🏆 社内AIイベント ロゴ投票アプリ</h1>
-      <p className="text-body text-text-muted">現在開催中のコンペはありません</p>
+      <p className="font-mono text-caption uppercase tracking-widest text-text-muted">
+        社内AIイベント
+      </p>
+      <h1 className="font-display text-h1 leading-none">ロゴ作成大会</h1>
+      <ColorBar className="h-1.5 w-24 rounded-full" />
+
+      {active ? (
+        <Link
+          href={`/c/${active.slug}`}
+          className="rounded-md bg-primary px-4 py-3 text-center font-semibold text-white"
+        >
+          投票に参加する
+        </Link>
+      ) : (
+        <p className="text-body text-text-muted">現在開催中のコンペはありません</p>
+      )}
+
+      <Link href="/admin" className="text-caption text-text-muted underline">
+        管理者はこちら
+      </Link>
     </main>
   );
 }

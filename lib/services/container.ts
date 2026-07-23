@@ -1,5 +1,6 @@
 import { CompetitionRepository } from '@/lib/repositories/CompetitionRepository';
 import { LogoRepository } from '@/lib/repositories/LogoRepository';
+import { RunoffRoundRepository } from '@/lib/repositories/RunoffRoundRepository';
 import { VoteRepository } from '@/lib/repositories/VoteRepository';
 import { AdminService } from '@/lib/services/AdminService';
 import { CompetitionService } from '@/lib/services/CompetitionService';
@@ -9,7 +10,15 @@ import { VoteService } from '@/lib/services/VoteService';
 
 export function createCompetitionService(): CompetitionService {
   const competitionRepository = new CompetitionRepository();
-  return new CompetitionService(competitionRepository);
+  const logoRepository = new LogoRepository();
+  const voteRepository = new VoteRepository();
+  const runoffRoundRepository = new RunoffRoundRepository();
+  return new CompetitionService(
+    competitionRepository,
+    logoRepository,
+    voteRepository,
+    runoffRoundRepository,
+  );
 }
 
 export function createUploadService(): UploadService {
@@ -23,7 +32,15 @@ export function createVoteService(): VoteService {
   const competitionRepository = new CompetitionRepository();
   const voteRepository = new VoteRepository();
   const phaseService = new PhaseService(competitionRepository);
-  return new VoteService(voteRepository, phaseService);
+  const runoffRoundRepository = new RunoffRoundRepository();
+  const logoRepository = new LogoRepository();
+  return new VoteService(
+    voteRepository,
+    phaseService,
+    competitionRepository,
+    runoffRoundRepository,
+    logoRepository,
+  );
 }
 
 export function createAdminService(): AdminService {
@@ -31,5 +48,12 @@ export function createAdminService(): AdminService {
   const logoRepository = new LogoRepository();
   const voteRepository = new VoteRepository();
   const phaseService = new PhaseService(competitionRepository);
-  return new AdminService(logoRepository, voteRepository, phaseService);
+  const runoffRoundRepository = new RunoffRoundRepository();
+  return new AdminService(
+    logoRepository,
+    voteRepository,
+    phaseService,
+    competitionRepository,
+    runoffRoundRepository,
+  );
 }

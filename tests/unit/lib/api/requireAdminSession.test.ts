@@ -2,7 +2,9 @@ import { SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hasValidAdminSession } from '@/lib/api/requireAdminSession';
+import type { CompetitionRepository } from '@/lib/repositories/CompetitionRepository';
 import type { LogoRepository } from '@/lib/repositories/LogoRepository';
+import type { RunoffRoundRepository } from '@/lib/repositories/RunoffRoundRepository';
 import type { VoteRepository } from '@/lib/repositories/VoteRepository';
 import { AdminService } from '@/lib/services/AdminService';
 import type { PhaseService } from '@/lib/services/PhaseService';
@@ -18,6 +20,8 @@ function createAdminService(): AdminService {
     {} as LogoRepository,
     {} as VoteRepository,
     {} as PhaseService,
+    {} as CompetitionRepository,
+    {} as RunoffRoundRepository,
   );
 }
 
