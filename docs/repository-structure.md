@@ -261,6 +261,7 @@ lib/services/
 - `SwipeSessionManager.ts`: 1次選考のキープ状態管理
 - `participantName.ts`: 参加者名の取得・保存（`localStorage`）
 - `usePhasePolling.ts`: 参加者向け画面が現在のフェーズを一定間隔で再取得するためのReact Hook
+- `voteSession.ts`: コンペ（slug）ごとの決選投票済みフラグの記録・取得（`hasVoted`/`markVoted`）。S-04投票成功時に記録し、S-01が参照して「投票へ進む」ボタンの非活性化に使う
 
 **命名規則**: クラスはPascalCase + `Manager`接尾辞（`SwipeSessionManager`）。関数・HookはcamelCase（Hookは`use`始まり）
 
@@ -273,7 +274,8 @@ lib/services/
 lib/client/
 ├── SwipeSessionManager.ts
 ├── participantName.ts
-└── usePhasePolling.ts
+├── usePhasePolling.ts
+└── voteSession.ts
 ```
 
 ### lib/types/ (型定義)
