@@ -124,18 +124,20 @@ export class VoteRepository {
     return (data as VoteRow[]).map(toVote);
   }
 
+  // vote_locksはランオフにより同一voter_anon_idがround分だけ複数行を持つため、
+  // 行数ではなくvoter_anon_idの一意数を投票済み人数として返す
   async countVoters(competitionId: string): Promise<number> {
     const supabase = getSupabaseClient();
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('vote_locks')
-      .select('*', { count: 'exact', head: true })
+      .select('voter_anon_id')
       .eq('competition_id', competitionId);
 
     if (error) {
       throw new Error(`投票済み人数の取得に失敗しました: ${error.message}`);
     }
 
-    return count ?? 0;
+    return new Set((data as { voter_anon_id: string }[]).map((row) => row.voter_anon_id)).size;
   }
 
   async countTotal(competitionId: string): Promise<number> {

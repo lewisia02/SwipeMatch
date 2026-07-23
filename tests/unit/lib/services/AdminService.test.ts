@@ -278,13 +278,15 @@ describe('AdminService', () => {
 
       expect(results.find((r) => r.id === 'logo-2')).toMatchObject({
         rank: 1,
+        voteCount: 7,
         isTiedForRunoff: false,
       });
       expect(results.find((r) => r.id === 'logo-1')).toMatchObject({
         rank: 2,
+        voteCount: 3,
         isTiedForRunoff: false,
       });
-      expect(results.find((r) => r.id === 'logo-3')).toMatchObject({ rank: 3 });
+      expect(results.find((r) => r.id === 'logo-3')).toMatchObject({ rank: 3, voteCount: 3 });
     });
 
     it('ランオフが複数ラウンド継続した場合、最終ラウンドの結果で順位が確定する', async () => {
@@ -315,10 +317,11 @@ describe('AdminService', () => {
 
       expect(results.find((r) => r.id === 'logo-1')).toMatchObject({
         rank: 1,
+        voteCount: 6,
         isTiedForRunoff: false,
       });
-      expect(results.find((r) => r.id === 'logo-2')).toMatchObject({ rank: 2 });
-      expect(results.find((r) => r.id === 'logo-3')).toMatchObject({ rank: 3 });
+      expect(results.find((r) => r.id === 'logo-2')).toMatchObject({ rank: 2, voteCount: 2 });
+      expect(results.find((r) => r.id === 'logo-3')).toMatchObject({ rank: 3, voteCount: 2 });
     });
 
     it('同率優勝が確定した場合、対象LogoにisJointWinnerが立ち順位を上書きしない', async () => {
