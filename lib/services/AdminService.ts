@@ -142,7 +142,11 @@ export class AdminService {
       const reorderedTargets = ordered
         .filter((logo) => targetIds.has(logo.id))
         .sort((a, b) => (targetRankIndex.get(a.id) ?? 0) - (targetRankIndex.get(b.id) ?? 0))
-        .map((logo, index) => ({ ...logo, isTiedForRunoff: index === 0 && stillTied }));
+        .map((logo, index) => ({
+          ...logo,
+          voteCount: roundVoteCounts[logo.id] ?? 0,
+          isTiedForRunoff: index === 0 && stillTied,
+        }));
 
       let cursor = 0;
       ordered = ordered.map((logo) => (targetIds.has(logo.id) ? reorderedTargets[cursor++] : logo));

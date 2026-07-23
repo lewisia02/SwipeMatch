@@ -201,20 +201,41 @@ describe('VoteRepository', () => {
   });
 
   describe('countVoters', () => {
-    it('vote_locksの件数を投票済み人数として返す', async () => {
+    it('voter_anon_idの一意数を投票済み人数として返す', async () => {
       vi.mocked(getSupabaseClient).mockReturnValue(
-        mockSupabaseClient({ count: 5, error: null }) as never,
+        mockSupabaseClient({
+          data: [{ voter_anon_id: 'anon-1' }, { voter_anon_id: 'anon-2' }],
+          error: null,
+        }) as never,
       );
       const repository = new VoteRepository();
 
       const result = await repository.countVoters(COMPETITION_ID);
 
-      expect(result).toBe(5);
+      expect(result).toBe(2);
+    });
+
+    it('ランオフで同一voter_anon_idが複数ラウンド分の行を持っていても重複カウントしない', async () => {
+      vi.mocked(getSupabaseClient).mockReturnValue(
+        mockSupabaseClient({
+          data: [
+            { voter_anon_id: 'anon-1' },
+            { voter_anon_id: 'anon-2' },
+            { voter_anon_id: 'anon-1' },
+          ],
+          error: null,
+        }) as never,
+      );
+      const repository = new VoteRepository();
+
+      const result = await repository.countVoters(COMPETITION_ID);
+
+      expect(result).toBe(2);
     });
 
     it('該当レコードがない場合は0を返す', async () => {
       vi.mocked(getSupabaseClient).mockReturnValue(
-        mockSupabaseClient({ count: null, error: null }) as never,
+        mockSupabaseClient({ data: [], error: null }) as never,
       );
       const repository = new VoteRepository();
 

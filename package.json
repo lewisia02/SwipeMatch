@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "seed": "node --env-file=.env.local scripts/seed.ts"
   },
   "dependencies": {
     "next": "^15.0.0",
