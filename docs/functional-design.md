@@ -267,7 +267,7 @@ class VoteRepository {
   createMany(votes: Omit<Vote, 'id' | 'createdAt'>[]): Promise<Vote[]>; // 各要素にcompetitionId・roundを含む
   countByAnonId(competitionId: string, anonId: string, round: number): Promise<number>;
   countByLogoId(competitionId: string, round: number): Promise<Record<string, number>>; // ランキング集計用。roundごとに独立して集計する
-  countVoters(competitionId: string): Promise<number>; // vote_locksの件数（投票済み人数）。管理者ダッシュボード用
+  countVoters(competitionId: string): Promise<number>; // vote_locksのvoter_anon_idユニーク数（投票済み人数）。ランオフで同一投票者が複数ラウンドの行を持っても重複カウントしない。管理者ダッシュボード用
   countTotal(competitionId: string): Promise<number>; // votesの件数（総投票数）。管理者ダッシュボード用
   findAllByCompetitionId(competitionId: string): Promise<Vote[]>; // created_at昇順。結果発表画面のタイムラプス演出用
   deleteLocksByCompetitionId(competitionId: string): Promise<void>; // コンペ削除用。vote_locks.competitionIdにはCASCADEが無いため明示的に削除する
@@ -1061,7 +1061,7 @@ GET /api/admin/competitions/[id]/results
 }
 ```
 
-`results`の`voteCount`は`round=1`（通常決選投票）の得票数であり、ランオフによる順位の入れ替えは`rank`にのみ反映される（ランオフ対象の得票数そのものは含まれない）。`phase`/`runoffRound`は運営結果画面がランオフ操作ボタン（開始・締切・再投票・同率優勝）の出し分けに使う。`closed`になったコンペに対しても呼び出し可能（過去コンペの結果閲覧のため）。
+`results`の`voteCount`は基本的に`round=1`（通常決選投票）の得票数だが、対象Logoがランオフの同着グループに含まれる場合は、そのLogoが関与した最新のランオフラウンドの得票数で上書きされる（同率優勝として確定した場合は、確定直前ラウンドの得票数のまま）。ランオフに含まれないLogoの`voteCount`は`round=1`のままである。`phase`/`runoffRound`は運営結果画面がランオフ操作ボタン（開始・締切・再投票・同率優勝）の出し分けに使う。`closed`になったコンペに対しても呼び出し可能（過去コンペの結果閲覧のため）。
 
 **エラーレスポンス**:
 - 401 Unauthorized: 管理者未認証、またはセッション（JWT）の期限切れ
