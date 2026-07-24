@@ -49,6 +49,7 @@ vi.mock('@/lib/repositories/VoteRepository', () => {
           competitionId: COMPETITION_ID,
           logoId: 'logo-1',
           voterAnonId: 'anon-1',
+          round: 1,
           createdAt: new Date('2026-07-22T00:00:00.000Z'),
         },
         {
@@ -56,6 +57,7 @@ vi.mock('@/lib/repositories/VoteRepository', () => {
           competitionId: COMPETITION_ID,
           logoId: 'logo-2',
           voterAnonId: 'anon-2',
+          round: 1,
           createdAt: new Date('2026-07-22T00:01:00.000Z'),
         },
       ]),
@@ -147,8 +149,8 @@ describe('GET /api/admin/competitions/[id]/results/timeline', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.timeline).toEqual([
-      { logoId: 'logo-1', votedAt: '2026-07-22T00:00:00.000Z' },
-      { logoId: 'logo-2', votedAt: '2026-07-22T00:01:00.000Z' },
+      { logoId: 'logo-1', votedAt: '2026-07-22T00:00:00.000Z', round: 1 },
+      { logoId: 'logo-2', votedAt: '2026-07-22T00:01:00.000Z', round: 1 },
     ]);
   });
 
