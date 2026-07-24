@@ -24,7 +24,7 @@ function createMockLogoRepository(logos: Logo[] = []) {
 function createMockVoteRepository(
   voteCountsByRound: Record<number, Record<string, number>> = {},
   stats: { voterCount?: number; totalVotes?: number } = {},
-  votes: Array<{ id: string; logoId: string; voterAnonId: string; createdAt: Date }> = [],
+  votes: Array<{ id: string; logoId: string; voterAnonId: string; round?: number; createdAt: Date }> = [],
 ) {
   return {
     countByLogoId: vi
@@ -33,7 +33,7 @@ function createMockVoteRepository(
     countVoters: vi.fn().mockResolvedValue(stats.voterCount ?? 0),
     countTotal: vi.fn().mockResolvedValue(stats.totalVotes ?? 0),
     findAllByCompetitionId: vi.fn().mockResolvedValue(
-      votes.map((v) => ({ ...v, competitionId: COMPETITION_ID })),
+      votes.map((v) => ({ round: 1, ...v, competitionId: COMPETITION_ID })),
     ),
   } as unknown as VoteRepository;
 }
@@ -616,7 +616,7 @@ describe('AdminService', () => {
       await expect(service.getVoteTimeline(COMPETITION_ID)).rejects.toThrow(PhaseMismatchError);
     });
 
-    it('投票を時系列順に{logoId, votedAt}へ整形して返し、voterAnonIdは含めない', async () => {
+    it('投票を時系列順に{logoId, votedAt, round}へ整形して返し、voterAnonIdは含めない', async () => {
       const votedAt1 = new Date('2026-07-22T00:00:00.000Z');
       const votedAt2 = new Date('2026-07-22T00:01:00.000Z');
       const voteRepository = createMockVoteRepository({}, {}, [
@@ -631,8 +631,28 @@ describe('AdminService', () => {
       const timeline = await service.getVoteTimeline(COMPETITION_ID);
 
       expect(timeline).toEqual([
-        { logoId: 'logo-1', votedAt: votedAt1 },
-        { logoId: 'logo-2', votedAt: votedAt2 },
+        { logoId: 'logo-1', votedAt: votedAt1, round: 1 },
+        { logoId: 'logo-2', votedAt: votedAt2, round: 1 },
+      ]);
+    });
+
+    it('ランオフの投票にはround2以降の値が設定される', async () => {
+      const votedAt1 = new Date('2026-07-22T00:00:00.000Z');
+      const votedAt2 = new Date('2026-07-22T00:05:00.000Z');
+      const voteRepository = createMockVoteRepository({}, {}, [
+        { id: 'vote-1', logoId: 'logo-1', voterAnonId: 'anon-1', round: 1, createdAt: votedAt1 },
+        { id: 'vote-2', logoId: 'logo-1', voterAnonId: 'anon-1', round: 2, createdAt: votedAt2 },
+      ]);
+      const service = buildService({
+        voteRepository,
+        phaseService: createMockPhaseService('results'),
+      });
+
+      const timeline = await service.getVoteTimeline(COMPETITION_ID);
+
+      expect(timeline).toEqual([
+        { logoId: 'logo-1', votedAt: votedAt1, round: 1 },
+        { logoId: 'logo-1', votedAt: votedAt2, round: 2 },
       ]);
     });
 

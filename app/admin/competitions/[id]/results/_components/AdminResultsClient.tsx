@@ -16,6 +16,7 @@ type LoadStatus = 'loading' | 'empty' | 'error' | 'ready' | 'timelapse' | 'playi
 interface VoteTimelineEntry {
   logoId: string;
   votedAt: string;
+  round: number;
 }
 
 interface ToastState {
@@ -36,6 +37,7 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
   const [phase, setPhase] = useState<EventPhase | null>(null);
   const [runoffRound, setRunoffRound] = useState<number | null>(null);
   const [runoffActionLoading, setRunoffActionLoading] = useState(false);
+  const [isTimelapsePlaying, setIsTimelapsePlaying] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [toast, setToast] = useState<ToastState | null>(null);
 
@@ -127,7 +129,10 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
         {loadStatus === 'ready' && (
           <Button
             type="button"
-            onClick={() => setLoadStatus(timeline.length === 0 ? 'playing' : 'timelapse')}
+            onClick={() => {
+              setIsTimelapsePlaying(false);
+              setLoadStatus(timeline.length === 0 ? 'playing' : 'timelapse');
+            }}
           >
             発表開始
           </Button>
@@ -190,12 +195,21 @@ export function AdminResultsClient({ id, title }: AdminResultsClientProps) {
       {loadStatus === 'ready' && <RankingList items={results} />}
 
       {loadStatus === 'timelapse' && (
-        <VoteTimelapseChart
-          logos={results}
-          timeline={timeline}
-          isPlaying={loadStatus === 'timelapse'}
-          onComplete={() => setLoadStatus('playing')}
-        />
+        <div className="flex flex-col gap-4">
+          <VoteTimelapseChart
+            logos={results}
+            timeline={timeline}
+            isPlaying={isTimelapsePlaying}
+            onComplete={() => setLoadStatus('playing')}
+          />
+          {!isTimelapsePlaying && (
+            <div className="flex justify-center">
+              <Button type="button" onClick={() => setIsTimelapsePlaying(true)}>
+                結果発表
+              </Button>
+            </div>
+          )}
+        </div>
       )}
 
       {(loadStatus === 'playing' || loadStatus === 'revealed') && (

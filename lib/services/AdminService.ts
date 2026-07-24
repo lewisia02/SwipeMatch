@@ -21,6 +21,7 @@ function findTiedTopLogoIds(logoIds: string[], voteCounts: Record<string, number
 export interface VoteTimelineEntry {
   logoId: string;
   votedAt: Date;
+  round: number;
 }
 
 export interface DashboardStats {
@@ -264,7 +265,7 @@ export class AdminService {
     await this.phaseService.assertPhaseAtLeast(competitionId, 'results');
 
     const votes = await this.voteRepository.findAllByCompetitionId(competitionId);
-    return votes.map((vote) => ({ logoId: vote.logoId, votedAt: vote.createdAt }));
+    return votes.map((vote) => ({ logoId: vote.logoId, votedAt: vote.createdAt, round: vote.round }));
   }
 
   async exportResultsCsv(competitionId: string): Promise<string> {
