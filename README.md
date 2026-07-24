@@ -108,6 +108,7 @@ npm run dev
 | `npm run lint` | ESLintによる静的解析 |
 | `npm run typecheck` | TypeScriptの型チェック |
 | `npm run format` | Prettierによるフォーマット |
+| `npm run seed` | `.env.local`の接続情報でSupabaseにサンプルデータを投入 |
 
 ## ドキュメント
 

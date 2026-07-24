@@ -28,6 +28,10 @@ export default async function GlobalTopPage() {
         <p className="text-body text-text-muted">現在開催中のコンペはありません</p>
       )}
 
+      <Link href="/how-to-use" className="text-caption text-text-muted underline">
+        使い方はこちら
+      </Link>
+
       <Link href="/admin" className="text-caption text-text-muted underline">
         管理者はこちら
       </Link>

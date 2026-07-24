@@ -2,7 +2,7 @@
 
 `consistency-check` スキルが横断チェックの起点として使う、プロジェクト内の横断的な概念の一覧。**チェックのたびに更新し続ける生きたドキュメント**であり、新しい概念が複数ドキュメントにまたがることが分かったら随時追記する。
 
-**更新日**: 2026-07-24（ランオフ得票数合算表示の横断レビューにより更新）
+**更新日**: 2026-07-24（使い方ガイド画面(S-10)追加により更新）
 
 ## 使い方
 
@@ -22,7 +22,8 @@
 | 参加者名/投稿者名の統合(NameGate) | ui-design.md, functional-design.md, glossary.md, repository-structure.md | 2026-07-22新設。`/c/[slug]`初回アクセス時に参加者名(何でもよい・匿名可)を`localStorage`(`lib/client/participantName.ts`)へ保存し、画像投稿フォームの投稿者名として自動使用。投稿フォーム自体の投稿者名入力欄は廃止(`createLogoSchema`等APIスキーマ自体は無変更) |
 | コンペの完全削除 | ui-design.md, functional-design.md, glossary.md, repository-structure.md | 2026-07-22新設。`DELETE /api/admin/competitions/[id]`、`closed`なコンペのみ対象、コンペ名の入力一致をサーバー側でも検証。Storage画像→logos(votesはON DELETE CASCADEで連動)→vote_locks→runoff_rounds→competitionsの順で削除(`CompetitionService.remove`)。2026-07-23のランオフ機能実装で`runoff_rounds`削除ステップを追加(`runoff_rounds.competition_id`にCASCADEが無いため、追加しないとランオフ実施済みコンペの削除がFK制約違反で失敗する不具合になるところだった。横断整合性チェック中に発見し修正) |
 | 管理者ダッシュボード集計(投稿状況/投票状況) | ui-design.md, functional-design.md, glossary.md | 2026-07-22新設。`GET /api/admin/competitions/[id]/stats`。`results`フェーズ以外でも取得可能な点が`getRankedResults`(resultsフェーズ限定)と異なる |
-| グローバルトップ(`/`)の管理者リンク方針 | ui-design.md, repository-structure.md | 2026-07-22変更。従来「参加者向け画面から管理者画面へのリンクは設置しない」方針だったが、グローバルトップに限り「管理者はこちら」リンクを追加する方針に変更。`/c/[slug]`配下(S-01〜S-04)からは引き続きリンクしない。あわせて`/`の自動`redirect()`も廃止し、明示的な導線ボタン方式に変更 |
+| グローバルトップ(`/`)の管理者リンク方針 | ui-design.md, repository-structure.md | 2026-07-22変更。従来「参加者向け画面から管理者画面へのリンクは設置しない」方針だったが、グローバルトップに限り「管理者はこちら」リンクを追加する方針に変更。`/c/[slug]`配下(S-01〜S-04)からは引き続きリンクしない。あわせて`/`の自動`redirect()`も廃止し、明示的な導線ボタン方式に変更。2026-07-24にグローバルトップへ「使い方はこちら」リンク(S-10 使い方ガイド画面、`/how-to-use`)も追加(下記「使い方ガイド画面(S-10)」の行を参照) |
+| 使い方ガイド画面(S-10)・使い方ガイド(Markdown版) | ui-design.md, repository-structure.md, docs/how-to-use.md | 2026-07-24新設。参加者向けに参加方法〜結果発表待ちまでの流れを説明するコンテンツで、Markdown版(`docs/how-to-use.md`)とアプリ内画面(S-10, `app/how-to-use/page.tsx`)の2形態を同時に維持する。S-10はコンペ・フェーズに依存しない完全な静的Server Componentで、`public/how-to-use/`配下の実画面スクリーンショット13枚を表示する。グローバルトップ(`/`)の「使い方はこちら」リンクから遷移する。Markdown版を更新した場合、内容が同期しているかS-10側もあわせて確認すること |
 | マイグレーションファイルの番号管理 | architecture.md, repository-structure.md, scripts/migrations/ | `0001_add_competitions.sql`(2026-07-20)、`0002_add_ended_phase.sql`(current_phase CHECK制約に`ended`追加、2026-07-22)、`0003_add_runoff.sql`(ランオフ機能、`runoff`フェーズ・`round`列・`runoff_rounds`テーブル追加、2026-07-23)の順で採番済み。architecture.mdは当初`0002`を`app_settings`削除用と予告していたが未実施のまま先行採番が続いており、`app_settings`削除を今後行う場合は`0004`以降を使うこと |
 | 匿名IDによる投票制御 | product-requirements.md, functional-design.md, architecture.md, repository-structure.md, glossary.md, development-guidelines.md | 1端末最大3票(決選投票=`round=1`)。2026-07-17にhttpOnly Cookie(middleware.ts発行)方式へ変更、リクエストボディでの自己申告は廃止。2026-07-19に`vote_locks`テーブル(voterAnonIdをPRIMARY KEY)による原子的な予約(`VoteRepository.reserveVoteSlot`)を追加し、同時リクエストのTOCTOUレース条件を解消(`countByAnonId`による事前チェックのみでは不十分だったため)。2026-07-23のランオフ機能実装で`vote_locks`の複合PRIMARY KEYに`round`を追加(`(competition_id, voter_anon_id, round)`)し、多重投票防止の判定単位をコンペ×ラウンド単位に拡張(別ラウンドでは同じanonIdでも独立して投票可能に) |
 | 画像アップロード方式(署名付きURL) | functional-design.md, architecture.md | Vercelボディサイズ制約回避のため2026-07-17に直接アップロード方式へ変更。2026-07-20の複数コンペ対応でパスが`POST /api/c/[slug]/logos/upload-url`に変更(旧: POST /api/logos/upload-url) |
