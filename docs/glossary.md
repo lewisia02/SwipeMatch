@@ -648,6 +648,6 @@ throw new ValidationError('投票できるのは3作品までです', 'logoIds')
 出力: [{A, rank: 1, isTiedForRunoff: true, isJointWinner: false}, {B, rank: 1, isTiedForRunoff: true, isJointWinner: false}, {C, rank: 3, isTiedForRunoff: false, isJointWinner: false}]
 ```
 
-**このアルゴリズムのスコープ**: `round=1`（通常決選投票）の得票数のみを対象とした基本順位付けを行う。ランオフ実施後の順位反映（各ラウンドの得票数による上書き、`isJointWinner`の設定）は`AdminService.getRankedResults`が本関数の出力に対して追加で行う多段ロジックの責務であり、本関数自体はランオフの経過を意識しない。
+**このアルゴリズムのスコープ**: `round=1`（通常決選投票）の得票数のみを対象とした基本順位付けを行う。ランオフ実施後の順位反映（各ラウンドの対象Logo間の順位入れ替え、決選投票とランオフの得票数の加算、`isJointWinner`の設定）は`AdminService.getRankedResults`が本関数の出力に対して追加で行う多段ロジックの責務であり、本関数自体はランオフの経過を意識しない。
 
 **関連ドキュメント**: [機能設計書](./functional-design.md#同数得票時のランオフ判定)

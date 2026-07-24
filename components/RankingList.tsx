@@ -35,7 +35,13 @@ export function RankingList({ items }: RankingListProps) {
             </div>
             <p className="text-body text-text-muted">&ldquo;{item.memo}&rdquo;</p>
           </div>
-          <span className="shrink-0 font-mono text-h2">{item.voteCount}票</span>
+          {item.runoffVoteCount > 0 ? (
+            <span className="shrink-0 whitespace-nowrap font-mono text-body">
+              決選投票{item.finalRoundVoteCount}票＋ランオフ{item.runoffVoteCount}票
+            </span>
+          ) : (
+            <span className="shrink-0 font-mono text-h2">{item.voteCount}票</span>
+          )}
         </li>
       ))}
     </ol>

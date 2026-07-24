@@ -7,7 +7,9 @@ import type { RankedLogo } from '@/lib/types/RankedLogo';
  * @param logos - 得票数を含むLogo一覧
  * @returns 順位とランオフ判定を付与したLogo一覧
  */
-export function rankWithTieDetection(logos: (Logo & { voteCount: number })[]): RankedLogo[] {
+export function rankWithTieDetection<T extends Logo & { voteCount: number }>(
+  logos: T[],
+): (T & Pick<RankedLogo, 'rank' | 'isTiedForRunoff' | 'isJointWinner'>)[] {
   const sorted = [...logos].sort((a, b) => b.voteCount - a.voteCount);
   const topVoteCount = sorted[0]?.voteCount ?? 0;
 
