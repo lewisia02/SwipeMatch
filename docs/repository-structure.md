@@ -283,7 +283,7 @@ lib/client/
 **役割**: `docs/functional-design.md` のデータモデル定義(`Competition` / `Logo` / `Vote`等)をTypeScriptの型として配置する
 
 **配置ファイル**:
-- `Competition.ts`（`EventPhase`/`CompetitionStatus`を含む。旧`AppSettings.ts`を置き換え。`EventPhase`は`'submission' | 'voting' | 'results' | 'runoff' | 'ended'`）, `Logo.ts`, `Vote.ts`（`round`フィールドと定数`FINAL_VOTE_ROUND`を含む）, `RunoffRound.ts`（ランオフ各ラウンドの対象Logo・解決状況）, `RankedLogo.ts`（結果発表のランキング表示用。`Logo`を拡張し`voteCount`/`rank`/`isTiedForRunoff`/`isJointWinner`を追加）
+- `Competition.ts`（`EventPhase`/`CompetitionStatus`を含む。旧`AppSettings.ts`を置き換え。`EventPhase`は`'submission' | 'voting' | 'results' | 'runoff' | 'ended'`）, `Logo.ts`, `Vote.ts`（`round`フィールドと定数`FINAL_VOTE_ROUND`を含む）, `RunoffRound.ts`（ランオフ各ラウンドの対象Logo・解決状況）, `RankedLogo.ts`（結果発表のランキング表示用。`Logo`を拡張し`voteCount`/`finalRoundVoteCount`/`runoffVoteCount`/`rank`/`isTiedForRunoff`/`isJointWinner`を追加）
 
 **命名規則**: PascalCase（エンティティ名と一致させる）
 

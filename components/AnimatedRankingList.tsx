@@ -27,7 +27,7 @@ interface AnimatedRankingListProps {
   onComplete: () => void;
 }
 
-function AnimatedVoteCount({ value }: { value: number }) {
+function AnimatedVoteCount({ value, label }: { value: number; label?: string }) {
   const shouldReduceMotion = useReducedMotion();
   const count = useMotionValue(0);
   const rounded = useTransform(count, (v) => Math.round(v));
@@ -41,6 +41,15 @@ function AnimatedVoteCount({ value }: { value: number }) {
       unsubscribe();
     };
   }, [count, rounded, value, shouldReduceMotion]);
+
+  if (label) {
+    return (
+      <span className="font-mono text-body">
+        {label}
+        {display}票
+      </span>
+    );
+  }
 
   return <span className="shrink-0 font-mono text-h2">{display}票</span>;
 }
@@ -114,7 +123,14 @@ export function AnimatedRankingList({ items, isPlaying, onComplete }: AnimatedRa
               </div>
               <p className="text-body text-text-muted">&ldquo;{item.memo}&rdquo;</p>
             </div>
-            <AnimatedVoteCount value={item.voteCount} />
+            {item.runoffVoteCount > 0 ? (
+              <span className="flex shrink-0 items-baseline gap-1 whitespace-nowrap">
+                <AnimatedVoteCount label="決選投票" value={item.finalRoundVoteCount} />＋
+                <AnimatedVoteCount label="ランオフ" value={item.runoffVoteCount} />
+              </span>
+            ) : (
+              <AnimatedVoteCount value={item.voteCount} />
+            )}
           </motion.li>
         ))}
       </AnimatePresence>

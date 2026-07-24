@@ -113,10 +113,14 @@ export class AdminService {
     const logosWithVoteCount = logos.map((logo) => ({
       ...logo,
       voteCount: voteCounts[logo.id] ?? 0,
+      finalRoundVoteCount: voteCounts[logo.id] ?? 0,
+      runoffVoteCount: 0,
     }));
 
     // round1の得票数を基本順位とし、ランオフ各ラウンドの結果で同着グループの内部順序のみを
-    // 上書きしていく（ラウンドの対象外Logoの順位には影響しない）
+    // 入れ替えていく（ラウンドの対象外Logoの順位には影響しない）。得票数はround1の得票数に
+    // ランオフの得票数を加算する（置き換えると、ランオフ対象外Logoのround1得票数と比較したときに
+    // 順位と矛盾する数字になるため）
     let ordered: RankedLogo[] = rankWithTieDetection(logosWithVoteCount).sort(
       (a, b) => a.rank - b.rank,
     );
@@ -143,11 +147,15 @@ export class AdminService {
       const reorderedTargets = ordered
         .filter((logo) => targetIds.has(logo.id))
         .sort((a, b) => (targetRankIndex.get(a.id) ?? 0) - (targetRankIndex.get(b.id) ?? 0))
-        .map((logo, index) => ({
-          ...logo,
-          voteCount: roundVoteCounts[logo.id] ?? 0,
-          isTiedForRunoff: index === 0 && stillTied,
-        }));
+        .map((logo, index) => {
+          const runoffVoteCount = logo.runoffVoteCount + (roundVoteCounts[logo.id] ?? 0);
+          return {
+            ...logo,
+            runoffVoteCount,
+            voteCount: logo.finalRoundVoteCount + runoffVoteCount,
+            isTiedForRunoff: index === 0 && stillTied,
+          };
+        });
 
       let cursor = 0;
       ordered = ordered.map((logo) => (targetIds.has(logo.id) ? reorderedTargets[cursor++] : logo));

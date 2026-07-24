@@ -254,7 +254,7 @@ describe('AdminService', () => {
       expect(results[1]).toMatchObject({ id: 'logo-1', voteCount: 3, rank: 2 });
     });
 
-    it('ランオフが1回で解消した場合、ランオフの得票数で対象Logoの順位が入れ替わる', async () => {
+    it('ランオフが1回で解消した場合、決選投票+ランオフの合算得票数で対象Logoの順位が入れ替わる', async () => {
       const logos = [
         buildLogo({ id: 'logo-1' }),
         buildLogo({ id: 'logo-2' }),
@@ -278,18 +278,60 @@ describe('AdminService', () => {
 
       expect(results.find((r) => r.id === 'logo-2')).toMatchObject({
         rank: 1,
-        voteCount: 7,
+        voteCount: 12,
+        finalRoundVoteCount: 5,
+        runoffVoteCount: 7,
         isTiedForRunoff: false,
       });
       expect(results.find((r) => r.id === 'logo-1')).toMatchObject({
         rank: 2,
-        voteCount: 3,
+        voteCount: 8,
+        finalRoundVoteCount: 5,
+        runoffVoteCount: 3,
         isTiedForRunoff: false,
       });
-      expect(results.find((r) => r.id === 'logo-3')).toMatchObject({ rank: 3, voteCount: 3 });
+      expect(results.find((r) => r.id === 'logo-3')).toMatchObject({
+        rank: 3,
+        voteCount: 3,
+        finalRoundVoteCount: 3,
+        runoffVoteCount: 0,
+      });
     });
 
-    it('ランオフが複数ラウンド継続した場合、最終ラウンドの結果で順位が確定する', async () => {
+    it('ランオフ経由Logoの合算voteCountが、順位の降順と矛盾しない（ランオフ対象外Logoより下位にならない）', async () => {
+      const logos = [
+        buildLogo({ id: 'logo-1' }),
+        buildLogo({ id: 'logo-2' }),
+        buildLogo({ id: 'logo-3' }),
+        buildLogo({ id: 'logo-4' }),
+        buildLogo({ id: 'logo-5' }),
+      ];
+      // round1: logo-1/2が5票で1位同着、logo-3が4票（同着境界外）、logo-4/5が2票
+      // round2（ランオフ）: logo-1が1票、logo-2が0票 → 合算後はlogo-1=6, logo-2=5, logo-3=4のまま降順を維持する
+      // （もしround2の得票数だけで上書きすると1,0,4,2,2となり2位→3位で逆転する不具合が再発する）
+      const voteRepository = createMockVoteRepository({
+        1: { 'logo-1': 5, 'logo-2': 5, 'logo-3': 4, 'logo-4': 2, 'logo-5': 2 },
+        2: { 'logo-1': 1, 'logo-2': 0 },
+      });
+      const runoffRoundRepository = createMockRunoffRoundRepository({
+        allRounds: [buildRunoffRound({ round: 2, logoIds: ['logo-1', 'logo-2'], resolution: null })],
+      });
+      const service = buildService({
+        logoRepository: createMockLogoRepository(logos),
+        voteRepository,
+        phaseService: createMockPhaseService('ended'),
+        runoffRoundRepository,
+      });
+
+      const results = await service.getRankedResults(COMPETITION_ID);
+      const sortedByRank = [...results].sort((a, b) => a.rank - b.rank);
+
+      for (let i = 1; i < sortedByRank.length; i++) {
+        expect(sortedByRank[i].voteCount).toBeLessThanOrEqual(sortedByRank[i - 1].voteCount);
+      }
+    });
+
+    it('ランオフが複数ラウンド継続した場合、全ラウンドの得票を合算した結果で順位が確定する', async () => {
       const logos = [
         buildLogo({ id: 'logo-1' }),
         buildLogo({ id: 'logo-2' }),
@@ -317,14 +359,26 @@ describe('AdminService', () => {
 
       expect(results.find((r) => r.id === 'logo-1')).toMatchObject({
         rank: 1,
-        voteCount: 6,
+        voteCount: 14,
+        finalRoundVoteCount: 5,
+        runoffVoteCount: 9,
         isTiedForRunoff: false,
       });
-      expect(results.find((r) => r.id === 'logo-2')).toMatchObject({ rank: 2, voteCount: 2 });
-      expect(results.find((r) => r.id === 'logo-3')).toMatchObject({ rank: 3, voteCount: 2 });
+      expect(results.find((r) => r.id === 'logo-2')).toMatchObject({
+        rank: 2,
+        voteCount: 10,
+        finalRoundVoteCount: 5,
+        runoffVoteCount: 5,
+      });
+      expect(results.find((r) => r.id === 'logo-3')).toMatchObject({
+        rank: 3,
+        voteCount: 2,
+        finalRoundVoteCount: 2,
+        runoffVoteCount: 0,
+      });
     });
 
-    it('同率優勝が確定した場合、対象LogoにisJointWinnerが立ち順位を上書きしない', async () => {
+    it('同率優勝が確定した場合、対象LogoにisJointWinnerが立ち順位・得票数を上書きしない', async () => {
       const logos = [
         buildLogo({ id: 'logo-1' }),
         buildLogo({ id: 'logo-2' }),
@@ -350,6 +404,8 @@ describe('AdminService', () => {
       const jointWinners = results.filter((r) => r.isJointWinner);
       expect(jointWinners.map((r) => r.id).sort()).toEqual(['logo-1', 'logo-2']);
       expect(jointWinners.every((r) => !r.isTiedForRunoff)).toBe(true);
+      // joint_winnerで確定したラウンドの投票は合算対象外（決選投票の得票数のまま）
+      expect(jointWinners.every((r) => r.voteCount === 5 && r.runoffVoteCount === 0)).toBe(true);
       expect(results.find((r) => r.id === 'logo-3')).toMatchObject({ rank: 3 });
     });
   });

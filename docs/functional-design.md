@@ -127,7 +127,7 @@ interface RunoffRound {
 
 **制約・目的**:
 - `(competitionId, round)`を一意制約とし、1コンペ・1ラウンドにつき1件のみ存在する
-- `logoIds`は当該ラウンド開始時点の同着対象Logoのスナップショットであり、以降の得票状況によって変化しない（結果発表の`AdminService.getRankedResults`が、このスナップショットを対象範囲として当該ラウンドの得票数で順位を上書きする）
+- `logoIds`は当該ラウンド開始時点の同着対象Logoのスナップショットであり、以降の得票状況によって変化しない（結果発表の`AdminService.getRankedResults`が、このスナップショットを対象範囲として当該ラウンドの得票数で順位を入れ替え、得票数を加算する）
 - `resolution`が`'joint_winner'`のラウンドは、それ以降のラウンドで順位を上書きせず、対象Logoを同順位のまま確定させる（詳細は「同数得票時のランオフ判定」を参照）
 
 ### ER図
@@ -410,7 +410,7 @@ interface RunoffStatus {
 **責務**:
 - 管理者パスワードの検証とセッション（JWT Cookie）発行
 - 指定コンペのフェーズ切り替え（`submission` → `voting` → `results` → `runoff` → `ended`、逆行遷移は`PhaseService.transitionTo`で拒否）
-- 指定コンペの得票数ランキングの集計（`round=1`の得票数を基本順位とし、ランオフ各ラウンドの得票数で同着グループの内部順序のみを多段的に上書きする）、同数得票のランオフ対象抽出
+- 指定コンペの得票数ランキングの集計（`round=1`の得票数を基本順位とし、ランオフ各ラウンドの得票数で同着グループの内部順序のみを多段的に入れ替え、得票数は決選投票+ランオフを加算する）、同数得票のランオフ対象抽出
 - ランオフの開始（初回開始／再投票の両方）・締切・同率優勝としての確定
 - 指定コンペの結果ランキングのCSVエクスポート
 - 指定コンペの投稿数・投稿詳細・投票状況（投票済み人数／総投票数）の集計（管理者ダッシュボード用。`getRankedResults`と異なり`results`フェーズ以外でも取得可能）
@@ -432,7 +432,9 @@ class AdminService {
 }
 
 interface RankedLogo extends Logo {
-  voteCount: number;
+  voteCount: number;             // finalRoundVoteCount + runoffVoteCount の合算値
+  finalRoundVoteCount: number;   // 決選投票（round=1）の得票数
+  runoffVoteCount: number;       // 関与した全ランオフラウンドの得票数の合計（対象外なら0）
   rank: number;
   isTiedForRunoff: boolean; // 同順位で境界にかかる場合にランオフ対象としてフラグを立てる
   isJointWinner: boolean;   // 運営がランオフの「同率優勝」を選択した対象の場合にtrue
@@ -1051,6 +1053,8 @@ GET /api/admin/competitions/[id]/results
       "uploaderName": "山田太郎",
       "memo": "一口メモ",
       "voteCount": 15,
+      "finalRoundVoteCount": 9,
+      "runoffVoteCount": 6,
       "rank": 1,
       "isTiedForRunoff": false,
       "isJointWinner": false
@@ -1061,7 +1065,7 @@ GET /api/admin/competitions/[id]/results
 }
 ```
 
-`results`の`voteCount`は基本的に`round=1`（通常決選投票）の得票数だが、対象Logoがランオフの同着グループに含まれる場合は、そのLogoが関与した最新のランオフラウンドの得票数で上書きされる（同率優勝として確定した場合は、確定直前ラウンドの得票数のまま）。ランオフに含まれないLogoの`voteCount`は`round=1`のままである。`phase`/`runoffRound`は運営結果画面がランオフ操作ボタン（開始・締切・再投票・同率優勝）の出し分けに使う。`closed`になったコンペに対しても呼び出し可能（過去コンペの結果閲覧のため）。
+`results`の`voteCount`は`finalRoundVoteCount`（`round=1`＝通常決選投票の得票数）と`runoffVoteCount`（対象Logoが関与した全ランオフラウンドの得票数の合計）を**加算**した値である。ランオフに含まれないLogoは`runoffVoteCount`が`0`のままなので、`voteCount`は`round=1`の得票数と一致する。同率優勝として確定したラウンドの投票は`runoffVoteCount`に加算されない（そのラウンドでは新たな投票を求めず運営が手動確定するケースを含むため）。ランオフ対象Logoの得票数を「決選投票◯票＋ランオフX票」のように内訳表示する場合は、`voteCount`ではなく`finalRoundVoteCount`/`runoffVoteCount`を個別に参照する。`phase`/`runoffRound`は運営結果画面がランオフ操作ボタン（開始・締切・再投票・同率優勝）の出し分けに使う。`closed`になったコンペに対しても呼び出し可能（過去コンペの結果閲覧のため）。
 
 **エラーレスポンス**:
 - 401 Unauthorized: 管理者未認証、またはセッション（JWT）の期限切れ
@@ -1236,9 +1240,9 @@ function rankWithTieDetection(logos: (Logo & { voteCount: number })[]): RankedLo
 - ランオフ投票画面では、対象Logoから**1つだけ**選択する（通常決選投票の「最大3つまで」とは異なる単一選択UI）
 
 **結果集計への反映（`AdminService.getRankedResults`）**:
-1. `round=1`の得票数で基本順位（`rank`・`isTiedForRunoff`）を算出する
-2. ランオフの各ラウンドを`round`昇順に処理し、`resolution`が`'joint_winner'`でなければ、そのラウンドの対象Logo間の順位のみを、そのラウンドの得票数で上書きする（対象外のLogoの順位には影響しない）
-3. `resolution`が`'joint_winner'`のラウンドに到達したら、その対象Logoに`isJointWinner: true`を立てて順位の上書きを打ち切る（それ以上のラウンドは無視する）
+1. `round=1`の得票数で基本順位（`rank`・`isTiedForRunoff`）を算出し、`finalRoundVoteCount`として保持する（`runoffVoteCount`は`0`で初期化）
+2. ランオフの各ラウンドを`round`昇順に処理し、`resolution`が`'joint_winner'`でなければ、そのラウンドの対象Logo間の順位のみを、そのラウンドの得票数で入れ替える（対象外のLogoの順位には影響しない）。得票数は上書きではなく`runoffVoteCount`に**加算**し、`voteCount`を`finalRoundVoteCount + runoffVoteCount`として再計算する（`round=1`の得票数を破棄して置き換えると、ランオフ対象外Logoの`round=1`得票数と比較したときに、順位の上下と`voteCount`の大小が矛盾する表示になるため）
+3. `resolution`が`'joint_winner'`のラウンドに到達したら、その対象Logoに`isJointWinner: true`を立てて順位の上書きを打ち切る（それ以上のラウンドは無視する。このラウンドの投票は`runoffVoteCount`にも加算しない）
 
 **このアプローチを選んだ理由（過去の設計判断からの変更点）**: 当初は「決選投票と同じ`votes`テーブル・投票フローを再利用する運用とし、専用機能は設けない」という運用回避の想定だったが、実際には`PhaseService.transitionTo`のフェーズ逆行禁止、投票APIの`voting`フェーズ限定、`(competition_id, voter_anon_id)`の複合PRIMARY KEYによる同一コンペ内の再投票禁止という3つの制約により、同一コンペ内で「同じ仕組みを再利用」すること自体が構造的に不可能だった（運営が同着解消のために新しいコンペを作り直す以外の手段が無かった）。これを解消するため、`round`概念の導入とフェーズへの`runoff`追加により、同一コンペ内で正式にランオフを実施できるようにした。
 
