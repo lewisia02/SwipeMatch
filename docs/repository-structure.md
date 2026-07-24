@@ -8,7 +8,9 @@ Next.js (App Router) の規約に従い、`app/` がUIレイヤーとAPIレイ�
 project-root/
 ├── middleware.ts           # 匿名ID(anon_id)のhttpOnly Cookie発行(Edge Middleware。コンペ非依存でグローバル単一)
 ├── app/                    # UIレイヤー(ページ) + APIレイヤー(Route Handlers)
-│   ├── page.tsx            # グローバルトップ: 開催中コンペへの導線ボタン・案内表示・管理者はこちらリンク(自動redirectはしない)
+│   ├── page.tsx            # グローバルトップ: 開催中コンペへの導線ボタン・案内表示・使い方はこちら/管理者はこちらリンク(自動redirectはしない)
+│   ├── how-to-use/
+│   │   └── page.tsx         # S-10 使い方ガイド画面(参加者向け、コンペ非依存の静的ページ)
 │   ├── c/
 │   │   └── [slug]/          # コンペ専用URL配下(参加者向け画面)
 │   │       ├── layout.tsx    # slug→Competition解決(Server Component、404/closedガード)
@@ -80,7 +82,8 @@ project-root/
 **役割**: `docs/ui-design.md` の画面一覧(S-01〜S-04, S-09)に対応するページを、コンペ専用URL `app/c/[slug]/` 配下に配置する。`app/page.tsx`はコンペに紐付かないグローバルなリダイレクト専用ページ
 
 **配置ファイル**:
-- `app/page.tsx`: グローバルトップ。`CompetitionService.findActive()`を呼び、開催中コンペがあれば「投票に参加する」ボタン（`/c/{slug}`）、無ければ案内メッセージを表示するServer Component。自動`redirect()`は行わない。常に「管理者はこちら」（`/admin`）リンクを表示する
+- `app/page.tsx`: グローバルトップ。`CompetitionService.findActive()`を呼び、開催中コンペがあれば「投票に参加する」ボタン（`/c/{slug}`）、無ければ案内メッセージを表示するServer Component。自動`redirect()`は行わない。常に「使い方はこちら」（`/how-to-use`）・「管理者はこちら」（`/admin`）リンクを表示する
+- `app/how-to-use/page.tsx`: S-10 使い方ガイド画面。コンペ・フェーズに依存しない完全な静的Server Component（データ取得・APIアクセスを行わない）。`public/how-to-use/`配下のスクリーンショットを参照する
 - `app/c/[slug]/layout.tsx`: `CompetitionService.findBySlug(slug)`でコンペを解決するServer Component。存在しなければ`notFound()`、`status`が`closed`または`currentPhase`が`ended`なら案内メッセージを表示し、配下のページをレンダリングしない。それ以外の場合、`components/NameGate.tsx`で配下のページ全体をラップし、参加者名が未入力ならS-01を含む配下画面のレンダリングをブロックする
 - `app/c/[slug]/page.tsx`: S-01 トップ画面
 - `app/c/[slug]/upload/page.tsx`: S-02 画像投稿画面
@@ -356,6 +359,7 @@ tests/e2e/
 - `repository-structure.md`: リポジトリ構造定義書(本ドキュメント)
 - `development-guidelines.md`: 開発ガイドライン
 - `glossary.md`: 用語集
+- `how-to-use.md`: 使い方ガイド（参加者向け）
 - `ideas/`: 壁打ち・初期アイデアメモ
 
 ### scripts/ (スクリプトディレクトリ)
@@ -379,6 +383,9 @@ scripts/
 ### public/ (静的アセット)
 
 **役割**: ファビコン、OGP画像など、Next.jsが配信する静的ファイルを配置する
+
+**配置ファイル**:
+- `how-to-use/`: S-10 使い方ガイド画面（`/how-to-use`）で表示する実画面スクリーンショット13枚（`00-namegate.png` 〜 `12-top-runoff-voted.png`）
 
 ## ファイル配置規則
 
